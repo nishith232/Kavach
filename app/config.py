@@ -20,6 +20,9 @@ BATCH_TIMEOUT_SECONDS = 180
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1")
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 LLM_MODEL = os.getenv("LLM_MODEL", "openai/gpt-oss-120b")
+# Tried in order when the main model is rate-limited (each Groq model has its own daily quota).
+LLM_FALLBACK_MODELS = [m.strip() for m in os.getenv(
+    "LLM_FALLBACK_MODELS", "openai/gpt-oss-20b,qwen/qwen3.6-27b").split(",") if m.strip()]
 
 # Domain words that help the speech recogniser on noisy scam calls.
 KEYTERMS = [

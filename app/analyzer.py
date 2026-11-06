@@ -5,14 +5,16 @@ of what they sent. The LLM verifies the language from the words (speech
 recognisers sometimes mislabel it) and reports it in the JSON.
 """
 import json
+import logging
 import re
 
-from openai import AsyncOpenAI, BadRequestError
+from openai import AsyncOpenAI, BadRequestError, NotFoundError, RateLimitError
 
 from . import config, languages as L
 from .scam_kb import knowledge_block
 
-llm = AsyncOpenAI(base_url=config.LLM_BASE_URL, api_key=config.LLM_API_KEY or "missing")
+log = logging.getLogger("kavach")
+llm = AsyncOpenAI(base_url=config.LLM_BASE_URL, api_key=config.LLM_API_KEY or "missing", max_retries=1)
 
 _LANG_LIST = ", ".join(f"{name}={code}" for code, name in L.NAMES.items())
 
@@ -69,8 +71,12 @@ MAX_INPUT_CHARS = 12000
 VERDICTS = ["LIKELY_SAFE", "NOT_ENOUGH_INFO", "SUSPICIOUS", "LIKELY_SCAM", "SCAM"]
 
 
-def _llm_extra() -> dict:
-    return {"reasoning_effort": "low"} if "gpt-oss" in config.LLM_MODEL else {}
+def _llm_extra(model: str | None = None) -> dict:
+    return {"reasoning_effort": "low"} if "gpt-oss" in (model or config.LLM_MODEL) else {}
+
+
+class AllModelsBusy(RuntimeError):
+    pass
 
 
 def _parse_json(text: str) -> dict:
@@ -100,9 +106,25 @@ def _failed_generation(err: BadRequestError) -> str:
 
 
 async def _complete(messages: list[dict]) -> str:
+    """Main model first; if it is rate-limited (e.g. free daily quota used up) or unavailable,
+    try each fallback model in turn."""
+    models = [config.LLM_MODEL] + [m for m in config.LLM_FALLBACK_MODELS if m != config.LLM_MODEL]
+    last: Exception | None = None
+    for model in models:
+        try:
+            return await _complete_with(model, messages)
+        except (RateLimitError, NotFoundError) as e:
+            last = e
+            log.warning("LLM %s unavailable (%s), trying next model", model, type(e).__name__)
+    raise AllModelsBusy(
+        "All AI models are rate-limited right now (free daily quota used up). "
+        "Try again later or add another LLM_MODEL in .env. Last error: " + str(last)[:160])
+
+
+async def _complete_with(model: str, messages: list[dict]) -> str:
     """Ask for JSON. Groq's strict JSON mode sometimes rejects the model's own (nearly valid) output
     with 400 'Failed to generate JSON'; recover from that instead of failing the request."""
-    base = dict(model=config.LLM_MODEL, messages=messages, temperature=0.2, max_tokens=2500, **_llm_extra())
+    base = dict(model=model, messages=messages, temperature=0.2, max_tokens=2500, **_llm_extra(model))
     try:
         resp = await llm.chat.completions.create(response_format={"type": "json_object"}, **base)
         return resp.choices[0].message.content or ""
