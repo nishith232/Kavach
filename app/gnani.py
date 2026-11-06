@@ -56,13 +56,54 @@ def _check(r: httpx.Response, what: str):
         raise GnaniError(f"{what} {r.status_code}: {r.text[:300]}")
 
 
-def wav_seconds(audio: bytes) -> float | None:
-    """Duration of a WAV file, or None if it isn't a readable WAV."""
-    try:
-        with wave.open(io.BytesIO(audio)) as w:
-            return w.getnframes() / float(w.getframerate())
-    except Exception:
+def read_wav(audio: bytes) -> tuple[int, int, int, bytes] | None:
+    """Parse a PCM WAV -> (channels, sample_width, sample_rate, pcm_bytes), or None.
+
+    Reads the RIFF chunks directly instead of trusting the header sizes: streaming
+    WAVs (like Gnani TTS output) store 0xFFFFFFFF as the length, which breaks
+    Python's wave module when re-writing.
+    """
+    if len(audio) < 12 or audio[:4] != b"RIFF" or audio[8:12] != b"WAVE":
         return None
+    pos, fmt = 12, None
+    while pos + 8 <= len(audio):
+        cid, size = audio[pos:pos + 4], int.from_bytes(audio[pos + 4:pos + 8], "little")
+        body = pos + 8
+        if cid == b"fmt ":
+            fmt = audio[body:body + size]
+        elif cid == b"data" and fmt and len(fmt) >= 16:
+            end = len(audio) if size in (0, 0xFFFFFFFF) or body + size > len(audio) else body + size
+            channels = int.from_bytes(fmt[2:4], "little")
+            rate = int.from_bytes(fmt[4:8], "little")
+            width = int.from_bytes(fmt[14:16], "little") // 8
+            if not (channels and rate and width):
+                return None
+            pcm = audio[body:end]
+            frame = channels * width
+            return channels, width, rate, pcm[: len(pcm) - len(pcm) % frame]
+        if size == 0xFFFFFFFF:
+            return None
+        pos = body + size + (size & 1)  # chunks are word-aligned
+    return None
+
+
+def write_wav(channels: int, width: int, rate: int, pcm: bytes) -> bytes:
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(channels)
+        w.setsampwidth(width)
+        w.setframerate(rate)
+        w.writeframes(pcm)
+    return buf.getvalue()
+
+
+def wav_seconds(audio: bytes) -> float | None:
+    """Duration of a WAV file, or None if it isn't a readable PCM WAV."""
+    info = read_wav(audio)
+    if not info:
+        return None
+    ch, width, rate, pcm = info
+    return len(pcm) / float(ch * width * rate)
 
 
 # ---------------------------------------------------------------- speech -> text
@@ -168,19 +209,9 @@ async def transcribe_batch(audio: bytes, filename: str, speakers: int = 2) -> di
 
 def split_wav(audio: bytes, seconds: int) -> list[bytes]:
     """Cut a WAV into pieces of at most `seconds` each."""
-    with wave.open(io.BytesIO(audio)) as r:
-        params, per = r.getparams(), r.getframerate() * seconds
-        pieces = []
-        while True:
-            frames = r.readframes(per)
-            if not frames:
-                break
-            buf = io.BytesIO()
-            with wave.open(buf, "wb") as w:
-                w.setparams(params)
-                w.writeframes(frames)
-            pieces.append(buf.getvalue())
-    return pieces
+    ch, width, rate, pcm = read_wav(audio)
+    step = ch * width * rate * seconds
+    return [write_wav(ch, width, rate, pcm[i:i + step]) for i in range(0, len(pcm), step)]
 
 
 async def transcribe_chunked(audio: bytes) -> dict:
@@ -255,18 +286,15 @@ def _chunks(text: str, limit: int = 350) -> list[str]:
 
 
 def join_wavs(wavs: list[bytes]) -> bytes:
-    if len(wavs) == 1:
-        return wavs[0]
-    out = io.BytesIO()
-    params = None
-    with wave.open(out, "wb") as w:
-        for b in wavs:
-            with wave.open(io.BytesIO(b)) as r:
-                if params is None:
-                    params = r.getparams()
-                    w.setparams(params)
-                w.writeframes(r.readframes(r.getnframes()))
-    return out.getvalue()
+    """Concatenate WAVs that share channels / sample width / sample rate."""
+    parsed = [read_wav(b) for b in wavs]
+    if any(p is None for p in parsed):
+        raise GnaniError("join_wavs: got audio that is not PCM WAV")
+    ch, width, rate, _ = parsed[0]
+    for c, w, r, _ in parsed[1:]:
+        if (c, w, r) != (ch, width, rate):
+            raise GnaniError(f"join_wavs: mixed formats ({ch}ch/{width*8}bit/{rate}Hz vs {c}ch/{w*8}bit/{r}Hz)")
+    return write_wav(ch, width, rate, b"".join(p[3] for p in parsed))
 
 
 async def synthesize(text: str, language: str, voice: str | None = None, sample_rate: int = 24000) -> bytes:
