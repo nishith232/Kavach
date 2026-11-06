@@ -27,8 +27,15 @@ async def main():
     rest = await step("STT (REST)", gnani.transcribe_rest(wav, "t.wav"))
     print("    ", rest["language"], "|", rest["transcript"])
 
-    batch = await step("STT (batch)", gnani.transcribe_batch(wav, "t.wav"))
-    print("    ", batch["language"], "|", batch["transcript"][:120])
+    try:
+        batch = await step("STT (batch)", gnani.transcribe_batch(wav, "t.wav"))
+        print("    ", batch["language"], "|", batch["transcript"][:120])
+    except gnani.GnaniError as e:
+        print(f"WARN STT (batch)   {e}")
+        print("     Long recordings will use the chunked fallback (WAV) until batch works.")
+        long_wav = gnani.join_wavs([wav, wav, wav])  # ~3x length, > 28 s
+        chunked = await step("STT (chunked)", gnani.transcribe_chunked(long_wav))
+        print("    ", chunked["language"], "|", chunked["transcript"][:120])
 
     signals = scan(rest["transcript"])
     result = await step("LLM analysis", Session().respond(
