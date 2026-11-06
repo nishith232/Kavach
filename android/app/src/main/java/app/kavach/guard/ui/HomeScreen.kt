@@ -30,6 +30,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -53,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kavach.guard.core.Alert
 import app.kavach.guard.core.Pipeline
+import app.kavach.guard.core.ScanEvent
 import app.kavach.guard.core.Stats
 import app.kavach.guard.core.Store
 import kotlinx.coroutines.launch
@@ -63,6 +65,7 @@ fun HomeScreen(onOpen: (Alert) -> Unit) {
     val perms = rememberPerms()
     val alerts by Store.alerts.collectAsStateWithLifecycle()
     val stats by Store.stats.collectAsStateWithLifecycle()
+    val scanLog by Store.scanLog.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var demoBusy by remember { mutableStateOf(false) }
     var demoNote by remember { mutableStateOf<String?>(null) }
@@ -148,6 +151,26 @@ fun HomeScreen(onOpen: (Alert) -> Unit) {
 
         item { StatsRow(stats) }
 
+        item {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SectionTitle("Live scan", Modifier.weight(1f))
+                    Text("every incoming message", color = K.Muted, fontSize = 11.sp)
+                }
+                Spacer(Modifier.height(6.dp))
+                GlassCard {
+                    if (scanLog.isEmpty()) {
+                        Text(
+                            if (perms.listener) "Waiting for messages… ask a friend to send you an SMS or WhatsApp."
+                            else "Turn on notification access to see messages being checked here.",
+                            color = K.Muted, fontSize = 13.sp,
+                        )
+                    }
+                    scanLog.take(6).forEach { e -> ScanRow(e) { e.alertId?.let { id -> alerts.firstOrNull { it.id == id }?.let(onOpen) } } }
+                }
+            }
+        }
+
         item { Column {
             GradientButton(
                 text = if (demoBusy) "Analysing…" else "Simulate a scam SMS",
@@ -193,6 +216,37 @@ fun HomeScreen(onOpen: (Alert) -> Unit) {
         }
 
         items(alerts.take(30), key = { it.id }) { a -> AlertRow(a) { onOpen(a) } }
+    }
+}
+
+@Composable
+private fun ScanRow(e: ScanEvent, onClick: () -> Unit) {
+    val (color, label) = when (e.status) {
+        "checking" -> K.Violet to "Checking with AI…"
+        "clean" -> K.Muted to "Clean · checked on phone"
+        "done" -> verdictColor(e.verdict ?: "") to (verdictLabel(e.verdict ?: "") + (e.risk?.let { " · risk $it" } ?: ""))
+        "offline" -> K.Warn to "Flagged on phone · AI offline"
+        else -> K.Warn to "AI unreachable · on-device: no strong signs"
+    }
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(enabled = e.alertId != null, onClick = onClick)
+            .padding(vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (e.status == "checking") {
+            CircularProgressIndicator(color = color, strokeWidth = 2.dp, modifier = Modifier.size(10.dp))
+        } else {
+            Box(Modifier.size(10.dp).clip(CircleShape).background(color))
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(e.app, color = K.Text, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 1)
+                Spacer(Modifier.width(8.dp))
+                Text(label, color = color, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Text(e.snippet, color = K.Muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
     }
 }
 

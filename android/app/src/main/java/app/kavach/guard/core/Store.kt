@@ -30,13 +30,15 @@ data class Alert(
     val source: String,          // "ai" (server verdict) or "on-device" (keyword rules only)
     val localLabels: List<String>,
     val audioPath: String?,
+    val spoken: String = "",
+    val languageCode: String = "",
 ) {
     val isThreat: Boolean get() = verdict in setOf("SCAM", "LIKELY_SCAM", "SUSPICIOUS")
 
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id); put("time", time); put("appName", appName); put("pkg", pkg); put("original", original)
         put("verdict", verdict); put("risk", risk); put("scamType", scamType); put("scamTypeLocal", scamTypeLocal)
-        put("summary", summary); put("language", language); put("source", source); put("audioPath", audioPath ?: "")
+        put("summary", summary); put("language", language); put("source", source); put("audioPath", audioPath ?: ""); put("spoken", spoken); put("languageCode", languageCode)
         put("redFlags", JSONArray(redFlags.map { JSONObject().put("quote", it.quote).put("why", it.why) }))
         put("facts", JSONArray(facts)); put("actions", JSONArray(actions)); put("localLabels", JSONArray(localLabels))
     }
@@ -51,6 +53,8 @@ data class Alert(
             language = o.optString("language"), source = o.optString("source"),
             localLabels = o.optJSONArray("localLabels").strings(),
             audioPath = o.optString("audioPath").ifBlank { null },
+            spoken = o.optString("spoken"),
+            languageCode = o.optString("languageCode"),
         )
     }
 }
@@ -61,12 +65,25 @@ fun JSONArray?.strings(): List<String> =
 fun JSONArray?.objects(): List<JSONObject> =
     if (this == null) emptyList() else (0 until length()).mapNotNull { optJSONObject(it) }
 
+/** One incoming message as it moves through the shield (shown live on the home screen). */
+data class ScanEvent(
+    val id: String,
+    val time: Long,
+    val app: String,
+    val snippet: String,
+    val status: String,          // "clean" | "checking" | "done" | "offline" | "error"
+    val verdict: String? = null,
+    val risk: Int? = null,
+    val alertId: String? = null,
+)
+
 data class Settings(
     val serverUrl: String = "http://192.168.1.10:8000",
     val replyLanguage: String = "auto",
     val speakAlerts: Boolean = true,
     val scanAllApps: Boolean = true,
     val alertOnSuspicious: Boolean = true,
+    val aiEveryMessage: Boolean = false,
 )
 
 data class Stats(val day: String = "", val scannedToday: Int = 0, val flaggedTotal: Int = 0, val aiChecks: Int = 0)
@@ -85,6 +102,14 @@ object Store {
     private val _stats = MutableStateFlow(Stats())
     val stats: StateFlow<Stats> = _stats.asStateFlow()
 
+    private val _scanLog = MutableStateFlow<List<ScanEvent>>(emptyList())
+    val scanLog: StateFlow<List<ScanEvent>> = _scanLog.asStateFlow()
+
+    fun logScan(e: ScanEvent) = _scanLog.update { (listOf(e) + it).take(25) }
+
+    fun updateScan(id: String, change: (ScanEvent) -> ScanEvent) =
+        _scanLog.update { list -> list.map { if (it.id == id) change(it) else it } }
+
     private val _listenerConnected = MutableStateFlow(false)
     val listenerConnected: StateFlow<Boolean> = _listenerConnected.asStateFlow()
 
@@ -98,6 +123,7 @@ object Store {
             speakAlerts = prefs.getBoolean("speakAlerts", true),
             scanAllApps = prefs.getBoolean("scanAllApps", true),
             alertOnSuspicious = prefs.getBoolean("alertOnSuspicious", true),
+            aiEveryMessage = prefs.getBoolean("aiEveryMessage", false),
         )
         _alerts.value = runCatching {
             JSONArray(prefs.getString("alerts", "[]")).objects().map { Alert.fromJson(it) }
@@ -119,6 +145,7 @@ object Store {
             .putBoolean("speakAlerts", s.speakAlerts)
             .putBoolean("scanAllApps", s.scanAllApps)
             .putBoolean("alertOnSuspicious", s.alertOnSuspicious)
+            .putBoolean("aiEveryMessage", s.aiEveryMessage)
             .apply()
     }
 
@@ -126,9 +153,10 @@ object Store {
 
     @Synchronized
     fun addAlert(alert: Alert) {
+        val isUpdate = _alerts.value.any { it.id == alert.id }
         _alerts.update { (listOf(alert) + it.filterNot { a -> a.id == alert.id }).take(MAX_ALERTS) }
         prefs.edit().putString("alerts", JSONArray(_alerts.value.map { it.toJson() }).toString()).apply()
-        if (alert.isThreat) bumpStats { it.copy(flaggedTotal = it.flaggedTotal + 1) }
+        if (alert.isThreat && !isUpdate) bumpStats { it.copy(flaggedTotal = it.flaggedTotal + 1) }
     }
 
     fun alert(id: String?): Alert? = _alerts.value.firstOrNull { it.id == id }

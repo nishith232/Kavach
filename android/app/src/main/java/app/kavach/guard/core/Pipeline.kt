@@ -2,6 +2,7 @@ package app.kavach.guard.core
 
 import android.content.Context
 import android.util.Base64
+import app.kavach.guard.service.ShieldListener
 import org.json.JSONObject
 import java.io.File
 import java.util.UUID
@@ -17,34 +18,66 @@ object Pipeline {
         DEMO,    // "simulate" button: always analysed and always notifies
     }
 
-    /** Minimum on-device signal before a notification is sent to the AI. */
-    private fun worthChecking(scan: RuleEngine.Scan) = scan.score >= 3 || scan.floor >= 35
+    /** Any real warning sign (one weight-2 rule) sends the message to the AI; or every chat message if enabled. */
+    private fun worthChecking(scan: RuleEngine.Scan, pkg: String, settings: Settings) =
+        scan.score >= 2 || scan.floor >= 35 || (settings.aiEveryMessage && ShieldListener.isMessagingApp(pkg))
 
     suspend fun process(ctx: Context, text: String, pkg: String, appName: String, mode: Mode): Alert? {
         val scan = RuleEngine.scan(text)
-        if (mode == Mode.AUTO && !worthChecking(scan)) return null
-
         val settings = Store.settings.value
+        val eventId = UUID.randomUUID().toString()
+        val logged = mode != Mode.MANUAL
+        val snippet = text.substringAfter('\n', text).replace('\n', ' ').take(140)
+        if (logged) {
+            Store.logScan(ScanEvent(eventId, System.currentTimeMillis(), appName, snippet, "checking"))
+        }
+        if (mode == Mode.AUTO && !worthChecking(scan, pkg, settings)) {
+            Store.updateScan(eventId) { it.copy(status = "clean") }
+            return null
+        }
+
         val wantVoice = settings.speakAlerts && mode != Mode.MANUAL
-        val alert = try {
-            val json = Api.analyze(settings.serverUrl, text, if (wantVoice) "both" else "text", settings.replyLanguage)
+        // DEMO gets voice in the same call; AUTO asks for text only and fetches voice later, only for threats.
+        val output = if (wantVoice && mode == Mode.DEMO) "both" else "text"
+        var alert = try {
+            val json = Api.analyze(settings.serverUrl, text, output, settings.replyLanguage)
             Store.countAiCheck()
             fromServer(ctx, json, text, pkg, appName, scan)
         } catch (e: Exception) {
             when {
                 mode == Mode.MANUAL -> throw e
-                scan.floor >= 60 -> offline(text, pkg, appName, scan)   // strong on-device signal: still warn
-                mode == Mode.DEMO -> offline(text, pkg, appName, scan)
-                else -> return null
+                scan.floor >= 60 || mode == Mode.DEMO -> offline(text, pkg, appName, scan)   // strong on-device signal: still warn
+                else -> {
+                    Store.updateScan(eventId) { it.copy(status = "error") }
+                    return null
+                }
             }
         }
 
+        if (logged) Store.updateScan(eventId) {
+            it.copy(
+                status = if (alert.source == "ai") "done" else "offline",
+                verdict = alert.verdict, risk = alert.risk, alertId = alert.id,
+            )
+        }
+        // Background messages the AI calls safe stay in the live feed only; threats become alerts.
+        if (mode == Mode.AUTO && !alert.isThreat) return alert
         Store.addAlert(alert)
         val notify = mode != Mode.MANUAL &&
             (alert.verdict in setOf("SCAM", "LIKELY_SCAM") || (alert.verdict == "SUSPICIOUS" && settings.alertOnSuspicious))
         if (notify) {
             Notifier.showAlert(ctx, alert)
-            if (wantVoice) Notifier.speak(alert.audioPath)
+            if (wantVoice) {
+                if (alert.audioPath == null && alert.spoken.isNotBlank()) {
+                    runCatching {
+                        val wav = Api.speak(settings.serverUrl, alert.spoken, alert.languageCode)
+                        val f = File(ctx.filesDir, "voice_${alert.id}.wav").apply { writeBytes(wav) }
+                        alert = alert.copy(audioPath = f.absolutePath)
+                        Store.addAlert(alert)   // same id: replaces the entry, now with audio
+                    }
+                }
+                Notifier.speak(alert.audioPath)
+            }
         }
         return alert
     }
@@ -79,6 +112,8 @@ object Pipeline {
             source = "ai",
             localLabels = scan.labels,
             audioPath = audioPath,
+            spoken = r.optString("spoken"),
+            languageCode = r.optString("language"),
         )
     }
 

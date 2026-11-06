@@ -132,6 +132,11 @@ fun SettingsScreen() {
             ToggleRow("Warn on “Suspicious” too", "Off = only alert for clear scams.", settings.alertOnSuspicious) { v ->
                 Store.updateSettings { it.copy(alertOnSuspicious = v) }
             }
+            ToggleRow(
+                "AI-check every chat message",
+                "Max protection: every SMS / WhatsApp / Telegram message gets an AI verdict, not just ones with warning signs. Uses more AI quota.",
+                settings.aiEveryMessage,
+            ) { v -> Store.updateSettings { it.copy(aiEveryMessage = v) } }
             ToggleRow("Scan all apps", "Off = only SMS, WhatsApp, Telegram and other chat apps.", settings.scanAllApps) { v ->
                 Store.updateSettings { it.copy(scanAllApps = v) }
             }

@@ -42,6 +42,11 @@
    "label": "KYC update / account block threat"
   },
   {
+   "pattern": "call(ing)? from (the |your |a )?bank|bank (se|nunchi|ninda|ಇಂದ) (call|phone)|bank (wale|walon|vaalu)|(update|verify|share) (your |my |the )?(kyc|pan|aadhaar|account) details|बैंक से (कॉल|फोन)|బ్యాంక్ నుండి (కాల్|ఫోన్)|ಬ್ಯಾಂಕ್‌?ನಿಂದ (ಕರೆ|ಫೋನ್)",
+   "weight": 2,
+   "label": "Someone claiming to be your bank"
+  },
+  {
    "pattern": "reversal code|verification code|security code|read (it|the code|that) (out|to me)|code .{0,20}read",
    "weight": 3,
    "label": "Asks you to read out a code sent to your phone"

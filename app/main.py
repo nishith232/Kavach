@@ -13,7 +13,7 @@ import time
 import uuid
 
 from fastapi import FastAPI, File, Form, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import gnani, languages
@@ -113,6 +113,17 @@ async def message(
     except Exception as e:  # show a readable error in the UI instead of a bare 500
         log.exception("message failed")
         return JSONResponse({"session_id": sid, "error": f"{type(e).__name__}: {str(e)[:300]}"}, 502)
+
+
+@app.post("/api/speak")
+async def speak(text: str = Form(...), language: str = Form("auto")):
+    """Text -> WAV with Gnani Timbre. The phone app calls this only for real scam alerts."""
+    try:
+        wav = await gnani.synthesize(text[:1500], language)
+        return Response(content=wav, media_type="audio/wav")
+    except Exception as e:
+        log.exception("speak failed")
+        return JSONResponse({"error": f"{type(e).__name__}: {str(e)[:200]}"}, 502)
 
 
 @app.get("/api/rules")

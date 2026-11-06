@@ -42,6 +42,8 @@ _RULES = [
     (r"upi\s*pin|\bpin\b|cvv|पिन|పిన్", 3, "Asks for PIN / CVV"),
     (r"anydesk|any\s*desk|teamviewer|quick\s*support|screen\s*shar", 3, "Asks to install a screen-sharing app"),
     (r"\bkyc\b|केवाईसी|కేవైసీ|ಕೆವೈಸಿ|account (will be |is )?(block|suspend|frozen|freez)|अकाउंट (ब्लॉक|बंद)|బ్లాక్ అవుతుంది|ಬ್ಲಾಕ್ ಆಗ", 2, "KYC update / account block threat"),
+    (r"call(ing)? from (the |your |a )?bank|bank (se|nunchi|ninda|ಇಂದ) (call|phone)|bank (wale|walon|vaalu)|(update|verify|share) (your |my |the )?(kyc|pan|aadhaar|account) details|"
+     r"बैंक से (कॉल|फोन)|బ్యాంక్ నుండి (కాల్|ఫోన్)|ಬ್ಯಾಂಕ್‌?ನಿಂದ (ಕರೆ|ಫೋನ್)", 2, "Someone claiming to be your bank"),
     (r"reversal code|verification code|security code|read (it|the code|that) (out|to me)|code .{0,20}read", 3, "Asks you to read out a code sent to your phone"),
     (r"warna|वरना|otherwise we|or else|ఇల్లేకపోతే|లేకపోతే|ಇಲ್ಲದಿದ್ದರೆ|இல்லையென்றால்", 2, "Threat: do this or else"),
     (r"parcel|courier|fedex|dhl|पार्सल|పార్సెల్|ಪಾರ್ಸೆಲ್", 2, "Parcel / courier story"),
