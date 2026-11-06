@@ -7,7 +7,7 @@ recognisers sometimes mislabel it) and reports it in the JSON.
 import json
 import re
 
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, BadRequestError
 
 from . import config, languages as L
 from .scam_kb import knowledge_block
@@ -28,6 +28,13 @@ HOW TO DECIDE
 - Be calibrated. Ordinary messages (a real OTP SMS that says "do not share", a delivery update with no payment request, a family chat)
   are LIKELY_SAFE. Only call it SCAM when the playbook clearly matches. If there is too little to judge, use NOT_ENOUGH_INFO
   and ask one clarifying question in "summary".
+- A scam needs a HARMFUL ASK: money/fees, OTP/PIN/CVV, a link or app install, remote access, secrecy, or personal
+  details under threat or time pressure. If there is NO harmful ask, it is LIKELY_SAFE (or NOT_ENOUGH_INFO),
+  even when police, banks, Aadhaar, parcels or payments are mentioned. Legitimate look-alikes:
+  police passport/tenant verification asking you to visit the station with documents and no fee; a bank calling
+  about something you applied for that says it will never ask for OTP; a delivery agent collecting cash-on-delivery
+  or showing a merchant QR to PAY for your order; a bill SMS with a consumer number and due date telling you to use
+  the official app; family members sending each other money.
 - Never invent facts, phone numbers or websites. Only cite the VERIFIED FACTS above, plus 1930 and cybercrime.gov.in.
 - kind is "analysis" for ANY call transcript, voice note, message, or description of a call/message: always give a verdict.
   kind is "answer" ONLY when an earlier analysis exists in this conversation AND the user is asking a question about it
@@ -87,6 +94,41 @@ def _verdict_for(score: int) -> str:
     return "LIKELY_SAFE"
 
 
+def _failed_generation(err: BadRequestError) -> str:
+    body = err.body if isinstance(err.body, dict) else {}
+    return str(body.get("failed_generation") or (body.get("error") or {}).get("failed_generation") or "")
+
+
+async def _complete(messages: list[dict]) -> str:
+    """Ask for JSON. Groq's strict JSON mode sometimes rejects the model's own (nearly valid) output
+    with 400 'Failed to generate JSON'; recover from that instead of failing the request."""
+    base = dict(model=config.LLM_MODEL, messages=messages, temperature=0.2, max_tokens=2500, **_llm_extra())
+    try:
+        resp = await llm.chat.completions.create(response_format={"type": "json_object"}, **base)
+        return resp.choices[0].message.content or ""
+    except BadRequestError as e:
+        if "json" not in str(e).lower():
+            raise
+        salvage = _failed_generation(e)
+        try:
+            _parse_json(salvage)
+            return salvage                      # the rejected output was usable after all
+        except Exception:
+            pass
+    # retry once without strict JSON mode; _parse_json pulls the object out of the text
+    retry = dict(base, messages=messages + [{"role": "user", "content": "Reply with the JSON object only."}])
+    resp = await llm.chat.completions.create(**retry)
+    return resp.choices[0].message.content or ""
+
+
+# Follow-up questions about an earlier verdict ("I already paid, what now?").
+_FOLLOWUP = re.compile(
+    r"what (should|do|can) i do|what now|now what|what next|i (already|have) (paid|sent|shared|transferred|given|told)|"
+    r"ab kya|kya karu|kya karun|maine .{0,40}(de diya|bhej diya|bata diya|transfer)|अब क्या|क्या करूँ|मैंने .{0,40}(दे दिया|भेज|बता दिया|ट्रांसफर)|"
+    r"ఏం చేయాలి|ఇప్పుడు ఏం|నేను .{0,40}(పంపాను|చెప్పాను|ఇచ్చాను)|ಏನು ಮಾಡಬೇಕು|ನಾನು .{0,40}(ಕಳುಹಿಸಿದೆ|ಹೇಳಿದೆ)|என்ன செய்வது|என்ன செய்ய",
+    re.I)
+
+
 class Session:
     """One user's conversation: analyses and follow-ups, so 'what now?' has context."""
 
@@ -109,23 +151,19 @@ class Session:
         messages = [{"role": "system", "content": SYSTEM_PROMPT}, *self.history[-6:],
                     {"role": "user", "content": user_msg}]
 
-        resp = await llm.chat.completions.create(
-            model=config.LLM_MODEL,
-            messages=messages,
-            response_format={"type": "json_object"},
-            temperature=0.2,
-            max_tokens=2500,
-            **_llm_extra(),
-        )
-        raw = resp.choices[0].message.content or ""
+        raw = await _complete(messages)
         try:
             result = _parse_json(raw)
         except Exception:
             result = {"kind": "answer", "summary": raw.strip() or "Sorry, I could not analyse that. Please try again.",
                       "verdict": "NOT_ENOUGH_INFO", "risk_score": 0}
 
-        # A follow-up "answer" only makes sense after an analysis, and never for audio/new content with red flags.
-        if result.get("kind") == "answer" and (self.last is None or not source.startswith("text") or signals["risk_floor"] >= 60):
+        # Decide analysis vs follow-up answer deterministically where we can.
+        is_followup = (self.last is not None and source.startswith("text") and len(content) < 400
+                       and bool(_FOLLOWUP.search(content)))
+        if is_followup:
+            result["kind"] = "answer"
+        elif result.get("kind") == "answer" and (self.last is None or not source.startswith("text") or signals["risk_floor"] >= 60):
             result["kind"] = "analysis"
         result = self._normalise(result, signals, reply_lang, stt_language, content)
 

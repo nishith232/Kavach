@@ -69,7 +69,7 @@ async def llm_with_retry(session: Session, text: str, **kw) -> dict:
             return await session.respond(text, **kw)
         except Exception as e:  # Groq rate limit (429) or a transient error
             msg = str(e)
-            if attempt == 3 or not re.search(r"429|rate|timeout|temporar|5\d\d", msg, re.I):
+            if attempt == 3 or not re.search(r"\b429\b|rate.?limit|timeout|temporar|\b5\d\d\b", msg, re.I):
                 raise
             wait = 15 * (attempt + 1)
             print(f"    LLM busy ({msg[:60]}...), retrying in {wait}s")
