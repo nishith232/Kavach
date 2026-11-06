@@ -31,15 +31,15 @@ scripts/make_samples.py generates demo scam calls with two Gnani voices + sample
 ```
 
 ## Run it
+With [uv](https://docs.astral.sh/uv/):
 ```powershell
-python -m venv .venv
-.venv\Scripts\activate                 # Mac/Linux: source .venv/bin/activate
-pip install -r requirements.txt
+uv sync                                # creates .venv and installs everything
 copy .env.example .env                 # then put your GNANI_API_KEY and LLM_API_KEY in .env
-py -m scripts.smoke_test               # every line should say OK
-py -m scripts.make_samples             # creates samples/*.wav + sample_messages.txt
-py -m uvicorn app.main:app --reload --port 8000
+uv run python -m scripts.smoke_test    # every line should say OK
+uv run python -m scripts.make_samples  # creates samples/*.wav + sample_messages.txt
+uv run uvicorn app.main:app --reload --port 8000
 ```
+(Without uv: `python -m venv .venv`, activate it, `pip install -r requirements.txt`, then the same commands without `uv run`.)
 Open http://localhost:8000.
 
 ## Try these
