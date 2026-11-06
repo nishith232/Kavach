@@ -29,8 +29,9 @@ HOW TO DECIDE
   are LIKELY_SAFE. Only call it SCAM when the playbook clearly matches. If there is too little to judge, use NOT_ENOUGH_INFO
   and ask one clarifying question in "summary".
 - Never invent facts, phone numbers or websites. Only cite the VERIFIED FACTS above, plus 1930 and cybercrime.gov.in.
-- If the user is asking a follow-up question (e.g. "I already shared the OTP, what now?") rather than sending new content,
-  answer it directly, using the earlier analysis in this conversation.
+- kind is "analysis" for ANY call transcript, voice note, message, or description of a call/message: always give a verdict.
+  kind is "answer" ONLY when an earlier analysis exists in this conversation AND the user is asking a question about it
+  (e.g. "I already shared the OTP, what now?").
 
 LANGUAGE
 - Write every user-facing field in the REPLY LANGUAGE given in the user message ("auto" = the language the user wrote or spoke in;
@@ -123,6 +124,9 @@ class Session:
             result = {"kind": "answer", "summary": raw.strip() or "Sorry, I could not analyse that. Please try again.",
                       "verdict": "NOT_ENOUGH_INFO", "risk_score": 0}
 
+        # A follow-up "answer" only makes sense after an analysis, and never for audio/new content with red flags.
+        if result.get("kind") == "answer" and (self.last is None or not source.startswith("text") or signals["risk_floor"] >= 60):
+            result["kind"] = "analysis"
         result = self._normalise(result, signals, reply_lang, stt_language, content)
 
         # keep compact history for follow-ups
@@ -164,9 +168,13 @@ class Session:
             verdict = str(r.get("verdict") or "").upper()
             if verdict not in VERDICTS:
                 verdict = _verdict_for(score)
-            # keep verdict consistent with a raised score
-            if VERDICTS.index(_verdict_for(score)) > VERDICTS.index(verdict) and verdict != "NOT_ENOUGH_INFO":
-                verdict = _verdict_for(score)
+            # keep the verdict consistent with the score (e.g. after the keyword floor raised it)
+            derived = _verdict_for(score)
+            if verdict == "NOT_ENOUGH_INFO":
+                if score >= 35:
+                    verdict = derived
+            elif VERDICTS.index(derived) > VERDICTS.index(verdict):
+                verdict = derived
             r["verdict"] = verdict
         else:
             r["verdict"] = (self.last or {}).get("verdict", "NOT_ENOUGH_INFO")
