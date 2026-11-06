@@ -49,6 +49,23 @@ Open http://localhost:8000.
 4. ⌨ Paste the SMS samples from `samples/sample_messages.txt` (including a real OTP SMS, which should be safe).
 5. 🎙 Speak: *"Someone called saying my SIM will be blocked by TRAI and I must press 9."*
 
+## Testing (48 realistic cases)
+`tests/cases.json` holds realistic, fictional cases modelled on real Indian scam scripts:
+- **3 per fraud type** (33): different languages (Hindi, Telugu, Kannada, Tamil, English, Hinglish), channels
+  (call recordings with speakers, SMS, WhatsApp, victims describing what happened) and difficulty
+- **8 safe look-alikes**: a real OTP SMS, a debit alert, COD delivery, family money message, real power bill,
+  a genuine bank callback, real police passport verification, friends discussing stocks
+- **7 edge cases**: too-short message, Telugu-English code-mixing, Telugu written in Devanagari, a general question,
+  a **prompt-injection** attempt, reply-language override, and a **multi-turn follow-up** ("I already paid, what now?")
+
+```powershell
+py -m scripts.run_tests --offline          # keyword layer only, instant, no API use
+py -m scripts.run_tests                    # full AI verdicts -> tests/report.md
+py -m scripts.run_tests --category sextortion
+py -m scripts.run_tests --audio --only DA-1 UP-2   # TTS -> STT -> analysis (uses Gnani credits)
+```
+The report shows pass rate, **scams caught**, **false alarms on safe messages**, results per fraud type, and details for each failure.
+
 ## How the verdict is made (good for your interview)
 - **Two layers.** A deterministic multilingual keyword scan sets a *risk floor*: the AI can raise the score but never rate an obvious scam as safe. The LLM then reasons over known Indian scam playbooks and verified facts, and must quote evidence verbatim.
 - **Calibrated.** Explicit SAFE and NOT_ENOUGH_INFO verdicts, so real OTP messages and normal calls aren't flagged.
