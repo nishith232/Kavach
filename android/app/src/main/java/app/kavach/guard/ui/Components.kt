@@ -66,6 +66,7 @@ fun AuroraBackground(content: @Composable BoxScope.() -> Unit) {
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
+            if (w < 2f || h < 2f) return@Canvas   // Android rejects 0-radius gradients
             val c1 = Offset(w * (0.15f + 0.25f * drift), h * 0.12f)
             val c2 = Offset(w * (0.95f - 0.3f * drift), h * (0.55f + 0.1f * drift))
             drawCircle(Brush.radialGradient(listOf(K.Violet.copy(alpha = 0.28f), Color.Transparent), c1, w * 0.75f), w * 0.75f, c1)
@@ -114,6 +115,7 @@ fun ShieldOrb(state: OrbState, modifier: Modifier = Modifier, size: Dp = 250.dp)
         Canvas(Modifier.fillMaxSize()) {
             val c = center
             val maxR = this.size.minDimension / 2f
+            if (maxR < 2f) return@Canvas
             if (live) for (i in 0..2) {
                 val p = (pulse + i / 3f) % 1f
                 drawCircle(color.copy(alpha = (1f - p) * 0.35f), maxR * (0.45f + 0.55f * p), c, style = Stroke(2.dp.toPx()))

@@ -1,6 +1,8 @@
 package app.kavach.guard
 
 import android.app.Application
+import android.util.Log
+import java.io.File
 import app.kavach.guard.core.Api
 import app.kavach.guard.core.Notifier
 import app.kavach.guard.core.RuleEngine
@@ -15,10 +17,29 @@ class KavachApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        installCrashReporter()
         Store.init(this)
-        RuleEngine.init(this)
-        Notifier.createChannels(this)
+        runCatching { RuleEngine.init(this) }.onFailure { Log.e("Kavach", "rules init failed", it) }
+        runCatching { Notifier.createChannels(this) }
         refreshRules()
+    }
+
+    /** Save any crash to a file so it can be viewed and copied from Settings on the next launch. */
+    private fun installCrashReporter() {
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+            runCatching {
+                crashFile(this).writeText(
+                    "Kavach Guard ${BuildConfig.VERSION_NAME} · Android ${android.os.Build.VERSION.RELEASE} · " +
+                        "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}\n\n" + Log.getStackTraceString(error),
+                )
+            }
+            previous?.uncaughtException(thread, error)
+        }
+    }
+
+    companion object {
+        fun crashFile(app: Application) = File(app.filesDir, "last_crash.txt")
     }
 
     /** Pull the latest keyword rules from the server; keep the bundled ones if it's unreachable. */

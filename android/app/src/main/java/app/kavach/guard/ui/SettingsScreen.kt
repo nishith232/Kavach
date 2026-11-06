@@ -36,7 +36,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -143,6 +145,27 @@ fun SettingsScreen() {
             }
             PermRow("Run in background", perms.battery) { requestBatteryExemption(ctx) }
             TextButton(onClick = { openAppInfo(ctx) }) { Text("App info (Allow restricted settings)", color = K.Muted) }
+        }
+
+        val app = ctx.applicationContext as KavachApp
+        val clipboard = LocalClipboardManager.current
+        var crash by remember { mutableStateOf(runCatching { KavachApp.crashFile(app).takeIf { it.exists() }?.readText() }.getOrNull()) }
+        if (crash != null || RuleEngine.skipped.isNotEmpty()) {
+            SectionTitle("Diagnostics")
+            GlassCard(accent = K.Warn) {
+                if (RuleEngine.skipped.isNotEmpty()) {
+                    Text("${RuleEngine.skipped.size} rule(s) skipped on this phone", color = K.Warn, fontWeight = FontWeight.SemiBold)
+                    Text(RuleEngine.skipped.joinToString("\n"), color = K.Muted, fontSize = 11.sp)
+                }
+                crash?.let { report ->
+                    Text("Last crash report", color = K.Warn, fontWeight = FontWeight.SemiBold)
+                    Text(report.take(1200), color = K.Muted, fontSize = 11.sp, lineHeight = 14.sp)
+                    Row {
+                        TextButton(onClick = { clipboard.setText(AnnotatedString(report)) }) { Text("Copy report", color = K.Teal) }
+                        TextButton(onClick = { KavachApp.crashFile(app).delete(); crash = null }) { Text("Clear", color = K.Muted) }
+                    }
+                }
+            }
         }
 
         SectionTitle("Privacy")

@@ -10,7 +10,13 @@ import java.util.regex.Pattern
  * only suspicious messages ever leave the phone.
  */
 object RuleEngine {
-    private const val FLAGS = Pattern.CASE_INSENSITIVE or Pattern.UNICODE_CASE or Pattern.UNICODE_CHARACTER_CLASS
+    // Android's regex engine (ICU) already treats \w and \b as Unicode-aware (Telugu, Hindi, Tamil...).
+    // It rejects Pattern.UNICODE_CHARACTER_CLASS with IllegalArgumentException, so don't pass it.
+    private const val FLAGS = Pattern.CASE_INSENSITIVE or Pattern.UNICODE_CASE
+
+    /** Rules that failed to compile on this device (shown in Settings for debugging). */
+    @Volatile var skipped: List<String> = emptyList()
+        private set
 
     data class Rule(val pattern: Pattern, val weight: Int, val label: String)
     data class Hit(val label: String, val match: String, val weight: Int)
@@ -26,20 +32,25 @@ object RuleEngine {
 
     val ruleCount: Int get() = rules.size
 
+    /** Never throws: a broken rules file must not crash the app. */
     fun init(ctx: Context) {
-        val bundled = ctx.assets.open("rules.json").bufferedReader().use { it.readText() }
         val cached = Store.cachedRules()
-        if (cached == null || runCatching { load(cached) }.isFailure) load(bundled)
+        if (cached != null && runCatching { load(cached) }.isSuccess) return
+        runCatching { load(ctx.assets.open("rules.json").bufferedReader().use { it.readText() }) }
     }
 
     /** Parse and swap in a rules JSON. Throws if invalid (caller keeps the old rules). */
     fun load(json: String) {
         val o = JSONObject(json)
         val arr = o.getJSONArray("rules")
-        val parsed = (0 until arr.length()).map {
+        val bad = mutableListOf<String>()
+        val parsed = (0 until arr.length()).mapNotNull {
             val r = arr.getJSONObject(it)
-            Rule(Pattern.compile(r.getString("pattern"), FLAGS), r.getInt("weight"), r.getString("label"))
+            runCatching { Rule(Pattern.compile(r.getString("pattern"), FLAGS), r.getInt("weight"), r.getString("label")) }
+                .onFailure { e -> bad += "${r.optString("label")}: ${e.message?.take(80)}" }
+                .getOrNull()
         }
+        if (parsed.isEmpty()) throw IllegalStateException("No rules compiled: ${bad.firstOrNull()}")
         val labels = o.getJSONArray("protected_labels")
         val newProtective = Pattern.compile(o.getString("protective"), FLAGS)
         val newAsks = Pattern.compile(o.getString("asks_otp"), FLAGS)
@@ -49,6 +60,7 @@ object RuleEngine {
         asksOtp = newAsks
         question = newQuestion
         rules = parsed
+        skipped = bad
     }
 
     fun scan(text: String): Scan {
