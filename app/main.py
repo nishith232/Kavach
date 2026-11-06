@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import gnani, languages
 from .analyzer import Session
-from .scam_kb import scan
+from .scam_kb import export_rules, scan
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("kavach")
@@ -113,6 +113,12 @@ async def message(
     except Exception as e:  # show a readable error in the UI instead of a bare 500
         log.exception("message failed")
         return JSONResponse({"session_id": sid, "error": f"{type(e).__name__}: {str(e)[:300]}"}, 502)
+
+
+@app.get("/api/rules")
+async def rules():
+    """Keyword rules for on-device pre-filtering in the Kavach Guard Android app."""
+    return export_rules()
 
 
 @app.get("/health")

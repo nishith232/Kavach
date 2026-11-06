@@ -86,16 +86,19 @@ _COMPILED = [(re.compile(p, re.I), w, label) for p, w, label in _RULES]
 _PROTECTIVE = re.compile(
     r"(never|not|n't)\s+(ask|share|call)|do not share|don'?t share|never share|"
     r"कभी (भी )?नहीं|शेयर न करें|साझा न करें|ఎప్పుడూ అడగ|షేర్ చేయవద్దు|ಎಂದಿಗೂ ಕೇಳ|பகிர வேண்டாம்", re.I)
+_ASKS_OTP_SRC = (r"(share|tell|give|read|bata|batao|చెప్పండి|ಹೇಳಿ|சொல்லுங்கள்)\W+(\w+\W+){0,3}(otp|ओटीपी|ఓటీపీ|ಒಟಿಪಿ|pin)|"
+                         r"(otp|ओटीपी|ఓటీపీ|ಒಟಿಪಿ|pin|code)\W+(\w+\W+){0,4}(share|tell|bata|read|చెప్పండి|ಹೇಳಿ)")
+_ASKS_OTP = re.compile(_ASKS_OTP_SRC, re.I)
 _PROTECTED_LABELS = {"Asks about an OTP", "Asks for PIN / CVV"}
-_QUESTION = re.compile(r"^(do|does|is|are|can|will|should|what|how|why|kya|क्या|ఏ|ಏನು)\b.*\?\s*$", re.I | re.S)
+_QUESTION_SRC = r"^(do|does|is|are|can|will|should|what|how|why|kya|क्या|ఏ|ಏನು)\b.*\?\s*$"
+_QUESTION = re.compile(_QUESTION_SRC, re.I | re.S)
 
 
 def scan(text: str, segments: list[dict] | None = None) -> dict:
     """Return matched red flags and a risk floor (0-90) the LLM's score can't go below."""
     hits, seen = [], set()
     protective = bool(_PROTECTIVE.search(text))
-    asks_otp = re.search(r"(share|tell|give|read|bata|batao|చెప్పండి|ಹೇಳಿ|சொல்லுங்கள்)\W+(\w+\W+){0,3}(otp|ओटीपी|ఓటీపీ|ಒಟಿಪಿ|pin)|"
-                         r"(otp|ओटीपी|ఓటీపీ|ಒಟಿಪಿ|pin|code)\W+(\w+\W+){0,4}(share|tell|bata|read|చెప్పండి|ಹೇಳಿ)", text, re.I)
+    asks_otp = _ASKS_OTP.search(text)
     for rx, weight, label in _COMPILED:
         if protective and not asks_otp and label in _PROTECTED_LABELS:
             continue
@@ -123,6 +126,19 @@ def scan(text: str, segments: list[dict] | None = None) -> dict:
     if len(text) < 200 and _QUESTION.match(text.strip()) and strong == 0:
         floor = 0
     return {"hits": hits, "score": score, "risk_floor": floor}
+
+
+def export_rules() -> dict:
+    """Everything the phone app needs to run the same keyword scan on-device."""
+    return {
+        "version": 1,
+        "rules": [{"pattern": p, "weight": w, "label": label} for p, w, label in _RULES],
+        "protective": _PROTECTIVE.pattern,
+        "protected_labels": sorted(_PROTECTED_LABELS),
+        "asks_otp": _ASKS_OTP_SRC,
+        "question": _QUESTION_SRC,
+        "floors": {"strong2_or_score9": 80, "strong1_and_score5": 60, "score4": 35},
+    }
 
 
 def knowledge_block() -> str:
