@@ -49,6 +49,26 @@ Open http://localhost:8000.
 4. ⌨ Paste the SMS samples from `samples/sample_messages.txt` (including a real OTP SMS, which should be safe).
 5. 🎙 Speak: *"Someone called saying my SIM will be blocked by TRAI and I must press 9."*
 
+## 📱 Kavach Guard: Android app (automatic message shield)
+Kavach Guard reads every incoming notification (SMS, WhatsApp, Telegram, email) **the moment it arrives**, before you open it.
+- Each message is checked **on the phone** with the same 44 scam rules as the server. Only suspicious ones are sent to the Kavach server for an AI verdict.
+- Scams trigger a **heads-up warning** with a "Call 1930" button, plus a **spoken warning** in your language (Gnani TTS).
+- Includes a modern dark UI: radar shield, alert feed with risk gauge, manual "Check a message" screen, settings.
+- If the server is unreachable, strong on-device matches still trigger a warning.
+
+**Install:** on the phone, open
+https://github.com/nishith232/Kavach/releases/download/android-latest/KavachGuard.apk
+(it's rebuilt automatically by GitHub Actions on every change to `android/`).
+
+**Connect it to the server:**
+1. On the laptop: `uv run uvicorn app.main:app --host 0.0.0.0 --port 8000` (allow it through Windows Firewall on private networks).
+2. Find the laptop's Wi-Fi IPv4 address with `ipconfig` (e.g. 192.168.1.7).
+3. In the app: Settings → AI server → `http://192.168.1.7:8000` → **Test connection**. The phone must be on the same Wi-Fi.
+
+**Turn on the shield (Android 13+ sideloaded apps):** Home → *Allow notification access*. If Android shows "Restricted setting",
+open App info → ⋮ → **Allow restricted settings**, then try again. On iQOO/vivo also allow background activity:
+Settings → Battery → Background power consumption management → Kavach Guard → Allow.
+
 ## Testing (48 realistic cases)
 `tests/cases.json` holds realistic, fictional cases modelled on real Indian scam scripts:
 - **3 per fraud type** (33): different languages (Hindi, Telugu, Kannada, Tamil, English, Hinglish), channels
