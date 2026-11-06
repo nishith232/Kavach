@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kavach · Is this a scam?</title>
+<style>
+  :root {
+    --bg:#f6f7f9; --panel:#fff; --ink:#15202b; --muted:#5d6b78; --line:#e3e7ec;
+    --brand:#1f4e79; --brand-2:#2c6aa0;
+    --scam:#b3261e; --scam-bg:#fdecea; --warn:#a15c00; --warn-bg:#fff4e0; --safe:#1e6b3a; --safe-bg:#e8f5ec; --info:#3d4f61; --info-bg:#eef2f6;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font-family: system-ui, "Segoe UI", "Nirmala UI", "Noto Sans", "Noto Sans Telugu", "Noto Sans Kannada", "Noto Sans Devanagari", "Noto Sans Tamil", sans-serif; }
+  .app { max-width:760px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; }
+  header { padding:20px 20px 10px; }
+  header h1 { margin:0; font-size:22px; color:var(--brand); display:flex; align-items:center; gap:8px; }
+  header p { margin:4px 0 0; color:var(--muted); font-size:14px; }
+  #feed { flex:1; padding:8px 16px 16px; display:flex; flex-direction:column; gap:14px; }
+  .empty { margin:24px 4px; padding:18px; border:1px dashed #c9d2db; border-radius:14px; color:var(--muted); font-size:14px; line-height:1.55; background:#fbfcfd; }
+  .empty b { color:var(--ink); }
+  .me { align-self:flex-end; max-width:85%; background:var(--brand); color:#fff; padding:10px 13px; border-radius:16px 16px 4px 16px; font-size:15px; white-space:pre-wrap; }
+  .me .tag { display:block; font-size:11px; opacity:.8; margin-top:4px; }
+  .card { align-self:stretch; background:var(--panel); border:1px solid var(--line); border-radius:16px; overflow:hidden; }
+  .verdict { padding:14px 16px; display:flex; gap:14px; align-items:center; }
+  .verdict.SCAM, .verdict.LIKELY_SCAM { background:var(--scam-bg); color:var(--scam); }
+  .verdict.SUSPICIOUS { background:var(--warn-bg); color:var(--warn); }
+  .verdict.LIKELY_SAFE { background:var(--safe-bg); color:var(--safe); }
+  .verdict.NOT_ENOUGH_INFO { background:var(--info-bg); color:var(--info); }
+  .meter { --p:0; width:58px; height:58px; border-radius:50%; flex:none; display:grid; place-items:center; font-weight:700; font-size:16px;
+           background: conic-gradient(currentColor calc(var(--p)*1%), rgba(0,0,0,.08) 0); position:relative; }
+  .meter::before { content:""; position:absolute; inset:6px; border-radius:50%; background:#fff; }
+  .meter span { position:relative; }
+  .verdict h2 { margin:0; font-size:18px; letter-spacing:.2px; }
+  .verdict .type { font-size:13px; opacity:.9; margin-top:2px; }
+  .body { padding:12px 16px 14px; }
+  .summary { font-size:15.5px; line-height:1.55; margin:0 0 10px; }
+  audio { width:100%; margin:4px 0 8px; }
+  h3 { font-size:12px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:14px 0 6px; }
+  ul { margin:0; padding-left:18px; } li { margin:4px 0; line-height:1.45; font-size:14.5px; }
+  .flag q { display:block; font-style:normal; background:#f3f5f7; border-left:3px solid var(--scam); padding:4px 8px; border-radius:4px; margin-bottom:2px; }
+  .flag q::before, .flag q::after { content:""; }
+  .actions li:first-child { font-weight:600; }
+  .helpline { display:inline-block; margin-top:10px; background:var(--scam); color:#fff; text-decoration:none; padding:8px 14px; border-radius:20px; font-weight:600; font-size:14px; }
+  details { margin-top:10px; font-size:14px; } summary { cursor:pointer; color:var(--brand-2); }
+  .transcript { white-space:pre-wrap; background:#f7f9fb; border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-top:6px; max-height:260px; overflow:auto; font-size:13.5px; }
+  .meta { font-size:11.5px; color:var(--muted); padding:0 16px 10px; }
+  .answer .body { padding-top:14px; }
+  .err { color:var(--scam); font-size:14px; align-self:center; }
+  .thinking { align-self:flex-start; color:var(--muted); font-size:14px; }
+  /* composer */
+  .composer { position:sticky; bottom:0; background:linear-gradient(transparent, var(--bg) 18%); padding:14px 16px 18px; }
+  .prefs { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:8px; font-size:13px; color:var(--muted); }
+  .seg { display:inline-flex; border:1px solid var(--line); border-radius:20px; overflow:hidden; background:#fff; }
+  .seg button { border:0; background:none; padding:6px 12px; font-size:13px; cursor:pointer; color:var(--ink); }
+  .seg button.on { background:var(--brand); color:#fff; }
+  select { border:1px solid var(--line); border-radius:20px; padding:6px 10px; background:#fff; font-size:13px; }
+  .box { background:#fff; border:1px solid var(--line); border-radius:18px; padding:8px; display:flex; flex-direction:column; gap:6px; box-shadow:0 2px 10px rgba(20,40,60,.06); }
+  .chip { display:none; align-self:flex-start; background:#eef2f6; border-radius:12px; padding:4px 10px; font-size:13px; }
+  .chip button { border:0; background:none; cursor:pointer; margin-left:6px; color:var(--muted); }
+  textarea { border:0; resize:none; outline:none; font:inherit; font-size:15px; min-height:44px; max-height:180px; padding:6px 8px; }
+  .row { display:flex; align-items:center; gap:6px; }
+  .icon { width:40px; height:40px; border-radius:50%; border:1px solid var(--line); background:#fff; cursor:pointer; font-size:18px; display:grid; place-items:center; }
+  .icon.rec { background:var(--scam); color:#fff; border-color:var(--scam); animation:pulse 1.2s infinite; }
+  @keyframes pulse { 50% { box-shadow:0 0 0 8px rgba(179,38,30,.15); } }
+  #timer { font-size:13px; color:var(--scam); min-width:40px; }
+  .send { margin-left:auto; border:0; background:var(--brand); color:#fff; border-radius:20px; padding:10px 18px; font-size:15px; font-weight:600; cursor:pointer; }
+  .send:disabled { background:#9fb2c4; cursor:default; }
+  .hint { font-size:12px; color:var(--muted); margin:6px 4px 0; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>🛡️ Kavach</h1>
+    <p>Got a suspicious call, voice note or message? Check it in any of 11 Indian languages, and get the answer as text, voice, or both.</p>
+  </header>
+
+  <main id="feed">
+    <div class="empty" id="empty">
+      <b>Three ways to check:</b><br>
+      🎙 <b>Speak</b>: describe the call, e.g. <i>"Someone from CBI called, said my Aadhaar is in a money laundering case"</i><br>
+      📎 <b>Upload</b>: a call recording or WhatsApp voice note (mp3, m4a, ogg, opus, wav, amr…)<br>
+      ⌨️ <b>Paste</b>: an SMS or WhatsApp message<br><br>
+      Then ask follow-ups like <i>"I already shared the OTP, what should I do?"</i>
+    </div>
+  </main>
+
+  <div class="composer">
+    <div class="prefs">
+      Reply as
+      <div class="seg" id="outSeg">
+        <button data-v="text">📝 Text</button><button data-v="voice">🔊 Voice</button><button data-v="both">Both</button>
+      </div>
+      in
+      <select id="lang">
+        <option value="auto">Same language as input</option>
+        <option value="te-IN">తెలుగు Telugu</option><option value="hi-IN">हिन्दी Hindi</option>
+        <option value="kn-IN">ಕನ್ನಡ Kannada</option><option value="ta-IN">தமிழ் Tamil</option>
+        <option value="ml-IN">മലയാളം Malayalam</option><option value="mr-IN">मराठी Marathi</option>
+        <option value="bn-IN">বাংলা Bengali</option><option value="gu-IN">ગુજરાતી Gujarati</option>
+        <option value="pa-IN">ਪੰਜਾਬੀ Punjabi</option><option value="en-IN">English</option>
+        <option value="hi-en">Hinglish</option>
+      </select>
+    </div>
+    <div class="box">
+      <div class="chip" id="chip"><span id="chipName"></span><button id="chipX" title="Remove">✕</button></div>
+      <textarea id="text" placeholder="Paste a message, or ask a question…"></textarea>
+      <div class="row">
+        <button class="icon" id="mic" title="Record (tap to start/stop)">🎙</button>
+        <button class="icon" id="attach" title="Upload recording">📎</button>
+        <span id="timer"></span>
+        <input type="file" id="file" accept="audio/*,video/mp4,.opus,.amr,.m4a" hidden />
+        <button class="send" id="send">Check</button>
+      </div>
+    </div>
+    <div class="hint">Kavach gives guidance, not legal advice. If you've lost money, call <b>1930</b> immediately.</div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const feed = $('#feed'), textEl = $('#text'), sendBtn = $('#send');
+let sessionId = null, pending = null, busy = false, player = null;
+
+// ---------- preferences (remembered if the browser allows) ----------
+const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
+                set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+let output = store.get('kavach.output', 'both');
+$('#lang').value = store.get('kavach.lang', 'auto');
+const paintSeg = () => document.querySelectorAll('#outSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === output));
+paintSeg();
+$('#outSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; output = b.dataset.v; store.set('kavach.output', output); paintSeg(); };
+$('#lang').onchange = e => store.set('kavach.lang', e.target.value);
+
+// ---------- attachments ----------
+function attach(blob, name) {
+  pending = { blob, name };
+  $('#chipName').textContent = '🎧 ' + name; $('#chip').style.display = 'inline-block';
+}
+function clearAttach() { pending = null; $('#chip').style.display = 'none'; $('#file').value = ''; }
+$('#chipX').onclick = clearAttach;
+$('#attach').onclick = () => $('#file').click();
+$('#file').onchange = e => { const f = e.target.files[0]; if (f) attach(f, f.name); };
+
+// ---------- microphone: tap to start / stop, 16 kHz WAV ----------
+let ctx, stream, src, proc, chunks = [], recording = false, t0 = 0, tick;
+const RATE = 16000, MAX_SEC = 270; // ~8.6 MB WAV, under Gnani's 10 MB upload limit
+$('#mic').onclick = () => recording ? stopRec() : startRec().catch(err => note('Mic error: ' + err.message));
+async function startRec() {
+  if (player) player.pause();
+  stream = stream || await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
+  ctx = ctx || new AudioContext(); await ctx.resume();
+  src = ctx.createMediaStreamSource(stream); proc = ctx.createScriptProcessor(4096, 1, 1); chunks = [];
+  proc.onaudioprocess = e => { chunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+  src.connect(proc); proc.connect(ctx.destination);
+  recording = true; t0 = Date.now(); $('#mic').classList.add('rec');
+  tick = setInterval(() => { const s = Math.round((Date.now() - t0) / 1000); $('#timer').textContent = `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; if (s >= MAX_SEC) stopRec(); }, 250);
+}
+function stopRec() {
+  recording = false; clearInterval(tick); $('#timer').textContent = ''; $('#mic').classList.remove('rec');
+  proc.disconnect(); src.disconnect();
+  const pcm = downsample(concat(chunks), ctx.sampleRate, RATE);
+  if (pcm.length < RATE * 0.6) { note('Recording too short.'); return; }
+  attach(encodeWav(pcm, RATE), `voice message (${Math.round(pcm.length / RATE)}s)`);
+}
+const concat = l => { const o = new Float32Array(l.reduce((n, a) => n + a.length, 0)); let i = 0; for (const a of l) { o.set(a, i); i += a.length; } return o; };
+function downsample(b, from, to) { if (from === to) return b; const r = from / to, o = new Float32Array(Math.floor(b.length / r));
+  for (let i = 0; i < o.length; i++) { const s = Math.floor(i * r), e = Math.min(b.length, Math.floor((i + 1) * r)); let t = 0; for (let j = s; j < e; j++) t += b[j]; o[i] = t / (e - s); } return o; }
+function encodeWav(x, rate) { const b = new ArrayBuffer(44 + x.length * 2), v = new DataView(b), w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0,'RIFF'); v.setUint32(4, 36 + x.length*2, true); w(8,'WAVE'); w(12,'fmt '); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,rate,true); v.setUint32(28,rate*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true); w(36,'data'); v.setUint32(40,x.length*2,true);
+  for (let i = 0; i < x.length; i++) { const s = Math.max(-1, Math.min(1, x[i])); v.setInt16(44 + i*2, s < 0 ? s*0x8000 : s*0x7fff, true); }
+  return new Blob([b], { type:'audio/wav' }); }
+
+// ---------- rendering ----------
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+const LABEL = { SCAM:'⚠️ SCAM', LIKELY_SCAM:'⚠️ Likely scam', SUSPICIOUS:'⚡ Suspicious', LIKELY_SAFE:'✅ Looks safe', NOT_ENOUGH_INFO:'❔ Need more info' };
+function add(html, cls) { $('#empty')?.remove(); const d = document.createElement('div'); d.className = cls; d.innerHTML = html; feed.appendChild(d); d.scrollIntoView({ behavior:'smooth', block:'end' }); return d; }
+const note = m => add(esc(m), 'err');
+
+function renderResult(d) {
+  const r = d.result, voiceOnly = d.output === 'voice', scammy = ['SCAM','LIKELY_SCAM'].includes(r.verdict);
+  const audio = d.audio_b64 ? `<audio controls src="data:audio/wav;base64,${d.audio_b64}"></audio>` : '';
+  const t = d.timings || {}, total = (t.stt_ms||0) + (t.llm_ms||0) + (t.tts_ms||0);
+  const meta = `<div class="meta">${esc(d.input.source)} · heard ${esc(d.input.stt_language || '–')} · replied in ${esc(r.language_name)} · ${total} ms (stt ${t.stt_ms ?? '–'} / llm ${t.llm_ms} / tts ${t.tts_ms ?? '–'})</div>`;
+  const transcript = d.input.transcript ? `<details><summary>What Kavach heard (${esc(d.input.stt_engine)} transcription)</summary><div class="transcript">${esc(d.input.transcript)}</div></details>` : '';
+
+  if (r.kind === 'answer') {
+    return add(`<div class="body">${audio}${voiceOnly ? '' : `<p class="summary">${esc(r.summary)}</p>`}${voiceOnly ? `<details><summary>Show text</summary><p class="summary">${esc(r.summary)}</p></details>` : ''}</div>${meta}`, 'card answer');
+  }
+  const flags = r.red_flags.map(f => `<li class="flag"><q>${esc(f.quote)}</q>${esc(f.why)}</li>`).join('');
+  const details = `
+    ${flags ? `<h3>Red flags</h3><ul>${flags}</ul>` : ''}
+    ${r.facts.length ? `<h3>The truth</h3><ul>${r.facts.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+    ${r.actions.length ? `<h3>What to do now</h3><ul class="actions">${r.actions.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+    ${scammy ? `<a class="helpline" href="tel:1930">📞 Call 1930 (Cyber Fraud Helpline)</a>` : ''}
+    ${transcript}`;
+  return add(`
+    <div class="verdict ${esc(r.verdict)}">
+      <div class="meter" style="--p:${r.risk_score}"><span>${r.risk_score}</span></div>
+      <div><h2>${LABEL[r.verdict] || esc(r.verdict)}</h2><div class="type">${esc(r.scam_type_local || r.scam_type || '')}</div></div>
+    </div>
+    <div class="body">
+      ${audio}
+      ${voiceOnly ? `<details><summary>Show full details</summary><p class="summary">${esc(r.summary)}</p>${details}</details>`
+                  : `<p class="summary">${esc(r.summary)}</p>${details}`}
+    </div>${meta}`, 'card');
+}
+
+// ---------- send ----------
+async function send() {
+  const text = textEl.value.trim();
+  if (busy || (!text && !pending)) return;
+  busy = true; sendBtn.disabled = true;
+  add(`${esc(text)}${pending ? `<span class="tag">🎧 ${esc(pending.name)}</span>` : ''}`, 'me');
+  const fd = new FormData();
+  if (pending) fd.append('audio', pending.blob, pending.name.includes('.') ? pending.name : 'voice.wav');
+  if (text) fd.append('text', text);
+  fd.append('output', output); fd.append('reply_language', $('#lang').value);
+  if (sessionId) fd.append('session_id', sessionId);
+  textEl.value = ''; const sentFile = pending; clearAttach();
+  const thinking = add(sentFile && !/voice message/.test(sentFile.name) ? 'Listening to the recording and separating speakers… (long files take up to a minute)' : 'Checking…', 'thinking');
+  try {
+    const res = await fetch('/api/message', { method:'POST', body: fd }), d = await res.json();
+    thinking.remove(); sessionId = d.session_id || sessionId;
+    if (d.error) { note(d.error); return; }
+    const card = renderResult(d);
+    player = card.querySelector('audio');
+    if (player) player.play().catch(() => {});
+  } catch (e) { thinking.remove(); note('Network error: ' + e.message); }
+  finally { busy = false; sendBtn.disabled = false; }
+}
+sendBtn.onclick = send;
+textEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+</script>
+</body>
+</html>
