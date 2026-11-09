@@ -16,7 +16,7 @@ from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import gnani, languages
+from . import assistant, gnani, languages
 from .analyzer import Session
 from .scam_kb import export_rules, scan
 
@@ -124,6 +124,68 @@ async def speak(text: str = Form(...), language: str = Form("auto")):
     except Exception as e:
         log.exception("speak failed")
         return JSONResponse({"error": f"{type(e).__name__}: {str(e)[:200]}"}, 502)
+
+
+@app.post("/api/voice/command")
+async def voice_command(
+    audio: UploadFile | None = File(None),
+    text: str | None = Form(None),
+    records: str = Form("[]"),
+    now_ms: int | None = Form(None),
+    focus_id: str | None = Form(None),
+    reply_language: str = Form("auto"),
+    output: str = Form("both"),
+):
+    """Voice assistant over the phone's own scanned messages.
+
+    audio (spoken command, Gnani Prisma) or text (typed / quick command) -> intent -> action on `records`
+    (the phone's message history, JSON list) -> reply in the user's language -> Gnani Timbre voice.
+    """
+    timings, stt = {}, None
+    try:
+        if audio is not None and audio.filename:
+            data = await audio.read()
+            if len(data) > MAX_UPLOAD_BYTES:
+                return JSONResponse({"error": "Recording is too long. Please say a short command."}, 413)
+            t0 = time.perf_counter()
+            stt = await gnani.transcribe(data, audio.filename)
+            timings["stt_ms"] = _ms(t0)
+        command = (stt["transcript"] if stt else "") or (text or "").strip()
+        if not command:
+            return JSONResponse({"error": "I didn't catch that. Please try again.", "transcript": ""}, 400)
+
+        lang = assistant.reply_language(stt["language"] if stt else None, command, reply_language)
+        t0 = time.perf_counter()
+        intent = await assistant.classify_intent(command)
+        recs = assistant.parse_records(records)
+        now = now_ms or int(time.time() * 1000)
+        result = assistant.run_intent(intent, recs, now, focus_id)
+        reply = await assistant.translate(result["reply"], lang)
+        if lang != "en-IN" and reply == result["reply"]:
+            lang = "en-IN"                       # translation unavailable: speak the English reply in English
+        timings["assistant_ms"] = _ms(t0)
+
+        audio_b64, tts_error = None, None
+        if output in ("voice", "both"):
+            t0 = time.perf_counter()
+            try:
+                audio_b64 = base64.b64encode(await gnani.synthesize(reply, lang)).decode()
+            except Exception as e:  # the text answer is still useful without voice
+                log.exception("assistant tts failed")
+                tts_error = f"{type(e).__name__}: {str(e)[:120]}"
+            timings["tts_ms"] = _ms(t0)
+
+        log.info("assistant intent=%s lang=%s records=%d matched=%d timings=%s",
+                 intent, lang, len(recs), len(result["record_ids"]), timings)
+        return {
+            "transcript": command, "heard_by": "gnani-prisma" if stt else "text",
+            "stt_language": stt["language"] if stt else None, "language": lang, "language_name": languages.name(lang),
+            "intent": intent, "reply": reply, "reply_en": result["reply"], "record_ids": result["record_ids"],
+            "facts": result["facts"], "audio_b64": audio_b64, "tts_error": tts_error, "timings": timings,
+        }
+    except Exception as e:
+        log.exception("voice command failed")
+        return JSONResponse({"error": f"{type(e).__name__}: {str(e)[:300]}"}, 502)
 
 
 @app.get("/api/rules")
