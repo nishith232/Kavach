@@ -78,8 +78,8 @@ object Notifier {
     private var player: MediaPlayer? = null
 
     /** Play a spoken warning (WAV saved from the server's Gnani TTS reply). */
-    fun speak(path: String?) {
-        if (path.isNullOrBlank()) return
+    fun speak(path: String?, onDone: (() -> Unit)? = null) {
+        if (path.isNullOrBlank()) { onDone?.invoke(); return }
         runCatching {
             player?.release()
             player = MediaPlayer().apply {
@@ -90,11 +90,11 @@ object Notifier {
                         .build(),
                 )
                 setDataSource(path)
-                setOnCompletionListener { it.release(); if (player === it) player = null }
+                setOnCompletionListener { it.release(); if (player === it) player = null; onDone?.invoke() }
                 prepare()
                 start()
             }
-        }
+        }.onFailure { onDone?.invoke() }
     }
 
     fun stopSpeaking() {

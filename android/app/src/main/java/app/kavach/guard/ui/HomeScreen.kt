@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,18 +55,17 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kavach.guard.core.Alert
 import app.kavach.guard.core.Pipeline
-import app.kavach.guard.core.ScanEvent
 import app.kavach.guard.core.Stats
 import app.kavach.guard.core.Store
 import kotlinx.coroutines.launch
 
 @Composable
-fun HomeScreen(onOpen: (Alert) -> Unit) {
+fun HomeScreen(onOpen: (Alert) -> Unit, onFilter: (HistoryFilter) -> Unit) {
     val ctx = LocalContext.current
     val perms = rememberPerms()
-    val alerts by Store.alerts.collectAsStateWithLifecycle()
+    val records by Store.alerts.collectAsStateWithLifecycle()
+    val alerts = records.filter { it.isThreat }
     val stats by Store.stats.collectAsStateWithLifecycle()
-    val scanLog by Store.scanLog.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var demoBusy by remember { mutableStateOf(false) }
     var demoNote by remember { mutableStateOf<String?>(null) }
@@ -149,24 +149,33 @@ fun HomeScreen(onOpen: (Alert) -> Unit) {
             }
         }
 
-        item { StatsRow(stats) }
+        item { StatsRow(records, stats, onFilter) }
 
         item {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     SectionTitle("Live scan", Modifier.weight(1f))
-                    Text("every incoming message", color = K.Muted, fontSize = 11.sp)
+                    if (records.isNotEmpty()) {
+                        Text(
+                            "See all ›", color = K.Teal, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onFilter(HistoryFilter.ALL) }.padding(4.dp),
+                        )
+                    } else {
+                        Text("every incoming message", color = K.Muted, fontSize = 11.sp)
+                    }
                 }
                 Spacer(Modifier.height(6.dp))
                 GlassCard {
-                    if (scanLog.isEmpty()) {
+                    if (records.isEmpty()) {
                         Text(
                             if (perms.listener) "Waiting for messages… ask a friend to send you an SMS or WhatsApp."
                             else "Turn on notification access to see messages being checked here.",
                             color = K.Muted, fontSize = 13.sp,
                         )
                     }
-                    scanLog.take(6).forEach { e -> ScanRow(e) { e.alertId?.let { id -> alerts.firstOrNull { it.id == id }?.let(onOpen) } } }
+                    records.take(6).forEach { r ->
+                        RecordRow(r, Modifier.clip(RoundedCornerShape(12.dp)).clickable { onOpen(r) }.padding(vertical = 7.dp))
+                    }
                 }
             }
         }
@@ -220,37 +229,6 @@ fun HomeScreen(onOpen: (Alert) -> Unit) {
 }
 
 @Composable
-private fun ScanRow(e: ScanEvent, onClick: () -> Unit) {
-    val (color, label) = when (e.status) {
-        "checking" -> K.Violet to "Checking with AI…"
-        "clean" -> K.Muted to "Clean · checked on phone"
-        "done" -> verdictColor(e.verdict ?: "") to (verdictLabel(e.verdict ?: "") + (e.risk?.let { " · risk $it" } ?: ""))
-        "offline" -> K.Warn to "Flagged on phone · AI offline"
-        else -> K.Warn to "AI unreachable · on-device: no strong signs"
-    }
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(enabled = e.alertId != null, onClick = onClick)
-            .padding(vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (e.status == "checking") {
-            CircularProgressIndicator(color = color, strokeWidth = 2.dp, modifier = Modifier.size(10.dp))
-        } else {
-            Box(Modifier.size(10.dp).clip(CircleShape).background(color))
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(e.app, color = K.Text, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 1)
-                Spacer(Modifier.width(8.dp))
-                Text(label, color = color, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            Text(e.snippet, color = K.Muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-    }
-}
-
-@Composable
 private fun LivePill(on: Boolean) {
     val color = if (on) K.Teal else K.Muted
     Row(
@@ -299,20 +277,32 @@ private fun SetupStep(
     }
 }
 
+/** Real counts from the saved message history; each tile opens History with that filter. */
 @Composable
-private fun StatsRow(stats: Stats) {
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        StatCard("Scanned today", stats.scannedToday, K.Info, Modifier.weight(1f))
-        StatCard("Threats flagged", stats.flaggedTotal, K.Danger, Modifier.weight(1f))
-        StatCard("AI checks", stats.aiChecks, K.Violet, Modifier.weight(1f))
+private fun StatsRow(records: List<Alert>, stats: Stats, onFilter: (HistoryFilter) -> Unit) {
+    Column {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatCard("Scanned", records.size, K.Info, Modifier.weight(1f)) { onFilter(HistoryFilter.ALL) }
+            StatCard("Fraud", records.count { it.isFraud }, K.Danger, Modifier.weight(1f)) { onFilter(HistoryFilter.FRAUD) }
+            StatCard("Suspicious", records.count { it.verdict == "SUSPICIOUS" }, K.Warn, Modifier.weight(1f)) { onFilter(HistoryFilter.SUSPICIOUS) }
+            StatCard("Genuine", records.count { it.isGenuine }, K.Teal, Modifier.weight(1f)) { onFilter(HistoryFilter.GENUINE) }
+        }
+        Text(
+            "In your history · ${stats.scannedToday} notifications today · ${stats.aiChecks} AI checks",
+            color = K.Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp, start = 4.dp),
+        )
     }
 }
 
 @Composable
-private fun StatCard(label: String, value: Int, color: androidx.compose.ui.graphics.Color, modifier: Modifier) {
-    GlassCard(modifier) {
-        Text("$value", fontSize = 26.sp, fontWeight = FontWeight.Black, color = color)
-        Text(label, color = K.Muted, fontSize = 12.sp, maxLines = 1)
+private fun StatCard(label: String, value: Int, color: androidx.compose.ui.graphics.Color, modifier: Modifier, onClick: () -> Unit) {
+    Column(
+        modifier.clip(RoundedCornerShape(18.dp)).background(K.Glass)
+            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick).padding(vertical = 12.dp, horizontal = 10.dp),
+    ) {
+        Text("$value", fontSize = 22.sp, fontWeight = FontWeight.Black, color = color)
+        Text(label, color = K.Muted, fontSize = 11.sp, maxLines = 1)
     }
 }
 

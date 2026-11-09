@@ -9,12 +9,15 @@ import java.util.UUID
 
 /**
  * message text -> on-device keyword scan -> (if suspicious) AI verdict from the server
- * -> saved alert -> heads-up notification + optional spoken warning in the user's language.
+ * -> saved record -> heads-up notification + optional spoken warning in the user's language.
+ *
+ * Every message the shield sees is saved as a record with a stable id (clean ones too), so the
+ * user can open exactly what was scanned from Live Scan, History, a notification or the voice assistant.
  */
 object Pipeline {
     enum class Mode {
         AUTO,    // from the notification listener: only suspicious text goes to the server
-        MANUAL,  // user pasted text in the app: always analysed, no notification
+        MANUAL,  // user pasted text, or re-checks a record: always analysed, no notification
         DEMO,    // "simulate" button: always analysed and always notifies
     }
 
@@ -22,18 +25,33 @@ object Pipeline {
     private fun worthChecking(scan: RuleEngine.Scan, pkg: String, settings: Settings) =
         scan.score >= 2 || scan.floor >= 35 || (settings.aiEveryMessage && ShieldListener.isMessagingApp(pkg))
 
-    suspend fun process(ctx: Context, text: String, pkg: String, appName: String, mode: Mode): Alert? {
+    suspend fun process(
+        ctx: Context, body: String, pkg: String, appName: String, mode: Mode,
+        sender: String = "", recordId: String? = null, recordTime: Long? = null,
+    ): Alert? {
+        // The AI sees the sender too ("From: VM-SBIBNK" vs a 10-digit number is a useful signal).
+        val text = if (sender.isNotBlank() && sender !in body) "From: $sender\n$body" else body
         val scan = RuleEngine.scan(text)
         val settings = Store.settings.value
-        val eventId = UUID.randomUUID().toString()
-        val logged = mode != Mode.MANUAL
-        val snippet = text.substringAfter('\n', text).replace('\n', ' ').take(140)
-        if (logged) {
-            Store.logScan(ScanEvent(eventId, System.currentTimeMillis(), appName, snippet, "checking"))
-        }
+        val pending = Alert(
+            id = recordId ?: UUID.randomUUID().toString(),
+            time = recordTime ?: System.currentTimeMillis(),
+            appName = appName, pkg = pkg, original = body, sender = sender,
+            verdict = "CHECKING", risk = scan.floor, scamType = "", scamTypeLocal = "", summary = "",
+            redFlags = scan.hits.filter { it.match.isNotBlank() }.map { RedFlag(it.match, it.label) },
+            facts = emptyList(), actions = emptyList(), language = "", source = "on-device",
+            localLabels = scan.labels, audioPath = null, status = "checking",
+        )
+        if (mode != Mode.MANUAL) Store.addAlert(pending)   // shows up in Live Scan right away
+
         if (mode == Mode.AUTO && !worthChecking(scan, pkg, settings)) {
-            Store.updateScan(eventId) { it.copy(status = "clean") }
-            return null
+            val clean = pending.copy(
+                verdict = "CLEAN", risk = 0, status = "clean",
+                summary = "Kavach's on-device check found no warning signs in this message, so it was not sent to the AI. " +
+                    "Open it and tap \"Analyse with AI\" for a full check.",
+            )
+            Store.addAlert(clean)
+            return clean
         }
 
         val wantVoice = settings.speakAlerts && mode != Mode.MANUAL
@@ -42,27 +60,22 @@ object Pipeline {
         var alert = try {
             val json = Api.analyze(settings.serverUrl, text, output, settings.replyLanguage)
             Store.countAiCheck()
-            fromServer(ctx, json, text, pkg, appName, scan)
+            fromServer(ctx, json, pending)
         } catch (e: Exception) {
             when {
-                mode == Mode.MANUAL -> throw e
-                scan.floor >= 60 || mode == Mode.DEMO -> offline(text, pkg, appName, scan)   // strong on-device signal: still warn
-                else -> {
-                    Store.updateScan(eventId) { it.copy(status = "error") }
-                    return null
-                }
+                mode == Mode.MANUAL -> throw e   // pasted text / re-check: show the error, keep the record as it was
+                scan.floor >= 60 || mode == Mode.DEMO -> offline(pending, scan)   // strong on-device signal: still warn
+                else -> pending.copy(
+                    verdict = "UNCHECKED", status = "error",
+                    summary = "Kavach couldn't reach its AI server, so this message has not been judged yet. " +
+                        (if (scan.labels.isEmpty()) "The on-device check found no strong warning signs."
+                        else "On-device signals: " + scan.labels.take(3).joinToString("; ") + ".") +
+                        " Tap \"Analyse with AI\" to try again.",
+                )
             }
         }
-
-        if (logged) Store.updateScan(eventId) {
-            it.copy(
-                status = if (alert.source == "ai") "done" else "offline",
-                verdict = alert.verdict, risk = alert.risk, alertId = alert.id,
-            )
-        }
-        // Background messages the AI calls safe stay in the live feed only; threats become alerts.
-        if (mode == Mode.AUTO && !alert.isThreat) return alert
         Store.addAlert(alert)
+
         val notify = mode != Mode.MANUAL &&
             (alert.verdict in setOf("SCAM", "LIKELY_SCAM") || (alert.verdict == "SUSPICIOUS" && settings.alertOnSuspicious))
         if (notify) {
@@ -82,26 +95,22 @@ object Pipeline {
         return alert
     }
 
-    private fun fromServer(
-        ctx: Context, json: JSONObject, text: String, pkg: String, appName: String, scan: RuleEngine.Scan,
-    ): Alert {
+    /** Full AI check of a record that was only checked on the phone (or failed); updates the same record. */
+    suspend fun recheck(ctx: Context, a: Alert): Alert? =
+        process(ctx, a.original, a.pkg, a.appName, Mode.MANUAL, a.sender, recordId = a.id, recordTime = a.time)
+
+    private fun fromServer(ctx: Context, json: JSONObject, pending: Alert): Alert {
         val r = json.getJSONObject("result")
-        val id = UUID.randomUUID().toString()
         val audioPath = json.optString("audio_b64").takeIf { it.isNotBlank() && it != "null" }?.let { b64 ->
             runCatching {
-                val f = File(ctx.filesDir, "voice_$id.wav")
+                val f = File(ctx.filesDir, "voice_${pending.id}.wav")
                 f.writeBytes(Base64.decode(b64, Base64.DEFAULT))
                 f.absolutePath
             }.getOrNull()
         }
-        return Alert(
-            id = id,
-            time = System.currentTimeMillis(),
-            appName = appName,
-            pkg = pkg,
-            original = text,
+        return pending.copy(
             verdict = r.optString("verdict", "NOT_ENOUGH_INFO"),
-            risk = r.optInt("risk_score", scan.floor),
+            risk = r.optInt("risk_score", pending.risk),
             scamType = r.optString("scam_type"),
             scamTypeLocal = r.optString("scam_type_local"),
             summary = r.optString("summary"),
@@ -110,38 +119,28 @@ object Pipeline {
             actions = r.optJSONArray("actions").strings(),
             language = r.optString("language_name", r.optString("language")),
             source = "ai",
-            localLabels = scan.labels,
             audioPath = audioPath,
             spoken = r.optString("spoken"),
             languageCode = r.optString("language"),
+            status = "done",
         )
     }
 
-    private fun offline(text: String, pkg: String, appName: String, scan: RuleEngine.Scan): Alert {
+    private fun offline(pending: Alert, scan: RuleEngine.Scan): Alert {
         val verdict = when {
             scan.floor >= 80 -> "LIKELY_SCAM"
             scan.floor >= 35 -> "SUSPICIOUS"
             else -> "NOT_ENOUGH_INFO"
         }
-        return Alert(
-            id = UUID.randomUUID().toString(),
-            time = System.currentTimeMillis(),
-            appName = appName,
-            pkg = pkg,
-            original = text,
+        return pending.copy(
             verdict = verdict,
             risk = scan.floor,
-            scamType = "",
-            scamTypeLocal = "",
             summary = "Kavach couldn't reach its AI server, but this message matches known scam patterns: " +
                 scan.labels.take(3).joinToString("; ") + ". Don't share OTPs, PINs or money, and don't call numbers in the message.",
-            redFlags = scan.hits.map { RedFlag(it.match, it.label) },
-            facts = emptyList(),
             actions = listOf("Don't reply, click links, or call numbers from this message.", "Report fraud on 1930 or cybercrime.gov.in."),
             language = "English",
             source = "on-device",
-            localLabels = scan.labels,
-            audioPath = null,
+            status = "offline",
         )
     }
 

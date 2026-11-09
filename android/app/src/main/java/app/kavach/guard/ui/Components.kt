@@ -180,7 +180,7 @@ fun VerdictChip(verdict: String, big: Boolean = false) {
     val icon = when (verdict) {
         "SCAM", "LIKELY_SCAM" -> Icons.Rounded.GppBad
         "SUSPICIOUS" -> Icons.Rounded.GppMaybe
-        "LIKELY_SAFE" -> Icons.Rounded.GppGood
+        "LIKELY_SAFE", "CLEAN" -> Icons.Rounded.GppGood
         else -> Icons.Rounded.Shield
     }
     Row(

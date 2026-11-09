@@ -28,7 +28,8 @@ object K {
 fun verdictColor(verdict: String): Color = when (verdict) {
     "SCAM", "LIKELY_SCAM" -> K.Danger
     "SUSPICIOUS" -> K.Warn
-    "LIKELY_SAFE" -> K.Teal
+    "LIKELY_SAFE", "CLEAN" -> K.Teal
+    "UNCHECKED" -> K.Muted
     else -> K.Info
 }
 
@@ -37,6 +38,9 @@ fun verdictLabel(verdict: String): String = when (verdict) {
     "LIKELY_SCAM" -> "Likely scam"
     "SUSPICIOUS" -> "Suspicious"
     "LIKELY_SAFE" -> "Looks safe"
+    "CLEAN" -> "No red flags"
+    "CHECKING" -> "Checking…"
+    "UNCHECKED" -> "Not checked"
     else -> "Need more info"
 }
 

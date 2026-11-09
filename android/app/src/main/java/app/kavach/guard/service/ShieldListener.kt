@@ -34,12 +34,12 @@ class ShieldListener : NotificationListenerService() {
         val pkg = sbn.packageName ?: return
         if (pkg == packageName || pkg in IGNORED) return
         if (!Store.settings.value.scanAllApps && !isMessagingApp(pkg)) return
-        val text = extractText(sbn) ?: return
-        if (Store.isDuplicate(text)) return
+        val (sender, body) = extractText(sbn) ?: return
+        if (Store.isDuplicate("$sender\n$body")) return
         Store.countScanned()
         val app = appLabel(pkg)
         scope.launch {
-            runCatching { Pipeline.process(applicationContext, text, pkg, app, Pipeline.Mode.AUTO) }
+            runCatching { Pipeline.process(applicationContext, body, pkg, app, Pipeline.Mode.AUTO, sender) }
         }
     }
 
@@ -48,7 +48,8 @@ class ShieldListener : NotificationListenerService() {
         super.onDestroy()
     }
 
-    private fun extractText(sbn: StatusBarNotification): String? {
+    /** (sender, message body) of a notification, or null if it carries no message worth checking. */
+    private fun extractText(sbn: StatusBarNotification): Pair<String, String>? {
         val n = sbn.notification ?: return null
         if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return null   // "5 new messages" summaries
         if (sbn.isOngoing) return null                                      // music, downloads, calls in progress
@@ -66,7 +67,7 @@ class ShieldListener : NotificationListenerService() {
         val body = parts.map { it.trim() }.filter { it.isNotEmpty() }.distinct().maxByOrNull { it.length } ?: return null
         if (body.length < 12) return null
         val sender = ex.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim().orEmpty()
-        return if (sender.isNotEmpty() && sender !in body) "From: $sender\n$body" else body
+        return sender to body
     }
 
     private fun appLabel(pkg: String): String = KNOWN[pkg] ?: runCatching {

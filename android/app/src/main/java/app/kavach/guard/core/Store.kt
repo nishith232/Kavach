@@ -2,6 +2,7 @@ package app.kavach.guard.core
 
 import android.content.Context
 import android.content.SharedPreferences
+import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,13 +33,30 @@ data class Alert(
     val audioPath: String?,
     val spoken: String = "",
     val languageCode: String = "",
+    val sender: String = "",
+    // "checking" (AI pending) | "clean" (on-device: no warning signs, not sent to AI) | "done" (AI verdict)
+    // | "offline" (on-device warning, AI unreachable) | "error" (AI unreachable, not judged)
+    val status: String = "done",
 ) {
     val isThreat: Boolean get() = verdict in setOf("SCAM", "LIKELY_SCAM", "SUSPICIOUS")
+    val isFraud: Boolean get() = verdict in setOf("SCAM", "LIKELY_SCAM")
+    val isGenuine: Boolean get() = verdict in setOf("LIKELY_SAFE", "CLEAN")
+    val aiChecked: Boolean get() = source == "ai"
+
+    /** Compact form sent to the voice assistant (it only reasons over these real records). */
+    fun toAssistantJson(): JSONObject = JSONObject().apply {
+        put("id", id); put("time", time); put("app", appName); put("sender", sender); put("verdict", verdict)
+        put("risk", risk); put("scam_type", scamType); put("summary", summary.take(400))
+        put("snippet", original.replace('\n', ' ').take(160))
+        put("red_flags", JSONArray(redFlags.map { it.quote }.filter { it.isNotBlank() }.take(3)))
+        put("actions", JSONArray(actions.take(2)))
+    }
 
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id); put("time", time); put("appName", appName); put("pkg", pkg); put("original", original)
         put("verdict", verdict); put("risk", risk); put("scamType", scamType); put("scamTypeLocal", scamTypeLocal)
         put("summary", summary); put("language", language); put("source", source); put("audioPath", audioPath ?: ""); put("spoken", spoken); put("languageCode", languageCode)
+        put("sender", sender); put("status", status)
         put("redFlags", JSONArray(redFlags.map { JSONObject().put("quote", it.quote).put("why", it.why) }))
         put("facts", JSONArray(facts)); put("actions", JSONArray(actions)); put("localLabels", JSONArray(localLabels))
     }
@@ -55,6 +73,8 @@ data class Alert(
             audioPath = o.optString("audioPath").ifBlank { null },
             spoken = o.optString("spoken"),
             languageCode = o.optString("languageCode"),
+            sender = o.optString("sender"),
+            status = o.optString("status", "done"),
         )
     }
 }
@@ -64,18 +84,6 @@ fun JSONArray?.strings(): List<String> =
 
 fun JSONArray?.objects(): List<JSONObject> =
     if (this == null) emptyList() else (0 until length()).mapNotNull { optJSONObject(it) }
-
-/** One incoming message as it moves through the shield (shown live on the home screen). */
-data class ScanEvent(
-    val id: String,
-    val time: Long,
-    val app: String,
-    val snippet: String,
-    val status: String,          // "clean" | "checking" | "done" | "offline" | "error"
-    val verdict: String? = null,
-    val risk: Int? = null,
-    val alertId: String? = null,
-)
 
 data class Settings(
     val serverUrl: String = "http://192.168.1.10:8000",
@@ -88,10 +96,14 @@ data class Settings(
 
 data class Stats(val day: String = "", val scannedToday: Int = 0, val flaggedTotal: Int = 0, val aiChecks: Int = 0)
 
-/** App-wide state shared by the notification service and the UI. Persisted in SharedPreferences. */
+/**
+ * App-wide state shared by the notification service and the UI. Persisted in SharedPreferences.
+ * `alerts` holds EVERY scanned message as a record (newest first), not only threats, so the user can
+ * open any message Kavach checked. The key is unchanged, so alerts saved by older versions still load.
+ */
 object Store {
     private lateinit var prefs: SharedPreferences
-    private const val MAX_ALERTS = 60
+    private const val MAX_RECORDS = 200
 
     private val _alerts = MutableStateFlow<List<Alert>>(emptyList())
     val alerts: StateFlow<List<Alert>> = _alerts.asStateFlow()
@@ -101,14 +113,6 @@ object Store {
 
     private val _stats = MutableStateFlow(Stats())
     val stats: StateFlow<Stats> = _stats.asStateFlow()
-
-    private val _scanLog = MutableStateFlow<List<ScanEvent>>(emptyList())
-    val scanLog: StateFlow<List<ScanEvent>> = _scanLog.asStateFlow()
-
-    fun logScan(e: ScanEvent) = _scanLog.update { (listOf(e) + it).take(25) }
-
-    fun updateScan(id: String, change: (ScanEvent) -> ScanEvent) =
-        _scanLog.update { list -> list.map { if (it.id == id) change(it) else it } }
 
     private val _listenerConnected = MutableStateFlow(false)
     val listenerConnected: StateFlow<Boolean> = _listenerConnected.asStateFlow()
@@ -151,17 +155,36 @@ object Store {
 
     fun setListenerConnected(v: Boolean) { _listenerConnected.value = v }
 
+    /** Insert or update a record (same id = same message), keeping its place in time order. */
     @Synchronized
     fun addAlert(alert: Alert) {
-        val isUpdate = _alerts.value.any { it.id == alert.id }
-        _alerts.update { (listOf(alert) + it.filterNot { a -> a.id == alert.id }).take(MAX_ALERTS) }
-        prefs.edit().putString("alerts", JSONArray(_alerts.value.map { it.toJson() }).toString()).apply()
-        if (alert.isThreat && !isUpdate) bumpStats { it.copy(flaggedTotal = it.flaggedTotal + 1) }
+        val previous = _alerts.value.firstOrNull { it.id == alert.id }
+        val record = alert.copy(original = alert.original.take(4000))
+        val all = (_alerts.value.filterNot { it.id == alert.id } + record).sortedByDescending { it.time }
+        val kept = all.take(MAX_RECORDS)
+        all.drop(MAX_RECORDS).forEach { deleteAudio(it) }
+        _alerts.value = kept
+        persist()
+        if (record.isThreat && previous?.isThreat != true) bumpStats { it.copy(flaggedTotal = it.flaggedTotal + 1) }
     }
+
+    private fun persist() {
+        prefs.edit().putString("alerts", JSONArray(_alerts.value.map { it.toJson() }).toString()).apply()
+    }
+
+    private fun deleteAudio(a: Alert) {
+        a.audioPath?.let { runCatching { File(it).delete() } }
+    }
+
+    /** The most recent records for the voice assistant, as JSON. */
+    fun assistantRecords(limit: Int = 150): String =
+        JSONArray(_alerts.value.filter { it.status != "checking" }.take(limit).map { it.toAssistantJson() }).toString()
 
     fun alert(id: String?): Alert? = _alerts.value.firstOrNull { it.id == id }
 
+    @Synchronized
     fun clearAlerts() {
+        _alerts.value.forEach { deleteAudio(it) }
         _alerts.value = emptyList()
         prefs.edit().putString("alerts", "[]").apply()
     }

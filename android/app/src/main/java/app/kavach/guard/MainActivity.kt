@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ManageSearch
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.Icon
@@ -53,10 +55,13 @@ import app.kavach.guard.core.Store
 import app.kavach.guard.ui.AlertDetailScreen
 import app.kavach.guard.ui.AuroraBackground
 import app.kavach.guard.ui.CheckScreen
+import app.kavach.guard.ui.HistoryFilter
+import app.kavach.guard.ui.HistoryScreen
 import app.kavach.guard.ui.HomeScreen
 import app.kavach.guard.ui.K
 import app.kavach.guard.ui.KavachTheme
 import app.kavach.guard.ui.SettingsScreen
+import app.kavach.guard.ui.VoiceScreen
 
 class MainActivity : ComponentActivity() {
     private val openAlertId = mutableStateOf<String?>(null)
@@ -78,6 +83,8 @@ private data class Tab(val label: String, val icon: ImageVector)
 
 private val TABS = listOf(
     Tab("Shield", Icons.Rounded.Shield),
+    Tab("History", Icons.Rounded.History),
+    Tab("Ask", Icons.Rounded.Mic),
     Tab("Check", Icons.AutoMirrored.Rounded.ManageSearch),
     Tab("Settings", Icons.Rounded.Settings),
 )
@@ -85,6 +92,7 @@ private val TABS = listOf(
 @Composable
 private fun KavachRoot(openAlertId: MutableState<String?>) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
+    var historyFilter by rememberSaveable { mutableStateOf(HistoryFilter.ALL) }
     val alerts by Store.alerts.collectAsStateWithLifecycle()
     val detail = alerts.firstOrNull { it.id == openAlertId.value }
 
@@ -101,8 +109,13 @@ private fun KavachRoot(openAlertId: MutableState<String?>) {
                     Box(Modifier.fillMaxSize().padding(pad)) {
                         AnimatedContent(tab, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "tab") { t ->
                             when (t) {
-                                0 -> HomeScreen(onOpen = { openAlertId.value = it.id })
-                                1 -> CheckScreen()
+                                0 -> HomeScreen(
+                                    onOpen = { openAlertId.value = it.id },
+                                    onFilter = { historyFilter = it; tab = 1 },
+                                )
+                                1 -> HistoryScreen(historyFilter, onFilter = { historyFilter = it }) { openAlertId.value = it.id }
+                                2 -> VoiceScreen(onOpen = { openAlertId.value = it.id })
+                                3 -> CheckScreen()
                                 else -> SettingsScreen()
                             }
                         }
