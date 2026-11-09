@@ -85,8 +85,12 @@ fun JSONArray?.strings(): List<String> =
 fun JSONArray?.objects(): List<JSONObject> =
     if (this == null) emptyList() else (0 until length()).mapNotNull { optJSONObject(it) }
 
+/** Kavach server on Render (works on any network, no laptop needed). Can still be changed in Settings. */
+const val DEFAULT_SERVER = "https://kavach-yqti.onrender.com"
+private const val OLD_DEFAULT_SERVER = "http://192.168.1.10:8000"
+
 data class Settings(
-    val serverUrl: String = "http://192.168.1.10:8000",
+    val serverUrl: String = DEFAULT_SERVER,
     val replyLanguage: String = "auto",
     val speakAlerts: Boolean = true,
     val scanAllApps: Boolean = true,
@@ -122,7 +126,7 @@ object Store {
     fun init(ctx: Context) {
         prefs = ctx.getSharedPreferences("kavach", Context.MODE_PRIVATE)
         _settings.value = Settings(
-            serverUrl = prefs.getString("serverUrl", Settings().serverUrl)!!,
+            serverUrl = prefs.getString("serverUrl", DEFAULT_SERVER)!!.let { if (it == OLD_DEFAULT_SERVER) DEFAULT_SERVER else it },
             replyLanguage = prefs.getString("replyLanguage", "auto")!!,
             speakAlerts = prefs.getBoolean("speakAlerts", true),
             scanAllApps = prefs.getBoolean("scanAllApps", true),

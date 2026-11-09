@@ -70,7 +70,12 @@ Kavach Guard reads every incoming notification (SMS, WhatsApp, Telegram, email) 
 https://github.com/nishith232/Kavach/releases/download/android-latest/KavachGuard.apk
 (it's rebuilt automatically by GitHub Actions on every change to `android/`).
 
-**Connect it to the server:**
+**Live server:** https://kavach-yqti.onrender.com (web app + API, hosted on Render's free plan from `render.yaml`).
+The Android app uses it by default, so no laptop is needed. The free server sleeps after 15 minutes idle; the first
+request then takes about 50 seconds. To deploy your own: Render → New → Blueprint → this repo, and enter
+`GNANI_API_KEY` and `LLM_API_KEY`.
+
+**Or connect it to a server on your laptop:**
 1. On the laptop: `uv run uvicorn app.main:app --host 0.0.0.0 --port 8000` (allow it through Windows Firewall on private networks).
 2. Find the laptop's Wi-Fi IPv4 address with `ipconfig` (e.g. 192.168.1.7).
 3. In the app: Settings → AI server → `http://192.168.1.7:8000` → **Test connection**. The phone must be on the same Wi-Fi.

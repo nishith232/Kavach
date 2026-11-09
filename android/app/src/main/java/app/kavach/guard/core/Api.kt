@@ -14,8 +14,8 @@ import java.util.concurrent.TimeUnit
 /** Talks to the Kavach FastAPI server (POST /api/message, GET /api/rules, GET /health). */
 object Api {
     private val client = OkHttpClient.Builder()
-        .connectTimeout(8, TimeUnit.SECONDS)
-        .readTimeout(90, TimeUnit.SECONDS)   // AI + voice can take a few seconds
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(120, TimeUnit.SECONDS)  // AI + voice take a few seconds; a sleeping free server ~50 s to wake
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 
