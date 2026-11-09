@@ -3,87 +3,127 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Kavach · Is this a scam?</title>
+<meta name="color-scheme" content="dark" />
+<title>Kavach Guard</title>
 <style>
   :root {
-    --bg:#f6f7f9; --panel:#fff; --ink:#15202b; --muted:#5d6b78; --line:#e3e7ec;
-    --brand:#1f4e79; --brand-2:#2c6aa0;
-    --scam:#b3261e; --scam-bg:#fdecea; --warn:#a15c00; --warn-bg:#fff4e0; --safe:#1e6b3a; --safe-bg:#e8f5ec; --info:#3d4f61; --info-bg:#eef2f6;
+    --bg:#070B16; --bg2:#0B1230; --teal:#3EF2C8; --violet:#7C5CFF; --danger:#FF4D6D; --warn:#FFB547; --info:#8AA4FF;
+    --text:#EAF0FF; --muted:#8C98B8; --glass:rgba(255,255,255,.08); --glass2:rgba(255,255,255,.13); --border:rgba(255,255,255,.15);
   }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink);
+  html { background:var(--bg); }
+  body { margin:0; min-height:100vh; color:var(--text); background:var(--bg);
          font-family: system-ui, "Segoe UI", "Nirmala UI", "Noto Sans", "Noto Sans Telugu", "Noto Sans Kannada", "Noto Sans Devanagari", "Noto Sans Tamil", sans-serif; }
-  .app { max-width:760px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; }
-  header { padding:20px 20px 10px; }
-  header h1 { margin:0; font-size:22px; color:var(--brand); display:flex; align-items:center; gap:8px; }
-  header p { margin:4px 0 0; color:var(--muted); font-size:14px; }
-  #feed { flex:1; padding:8px 16px 16px; display:flex; flex-direction:column; gap:14px; }
-  .empty { margin:24px 4px; padding:18px; border:1px dashed #c9d2db; border-radius:14px; color:var(--muted); font-size:14px; line-height:1.55; background:#fbfcfd; }
-  .empty b { color:var(--ink); }
-  .me { align-self:flex-end; max-width:85%; background:var(--brand); color:#fff; padding:10px 13px; border-radius:16px 16px 4px 16px; font-size:15px; white-space:pre-wrap; }
-  .me .tag { display:block; font-size:11px; opacity:.8; margin-top:4px; }
-  .card { align-self:stretch; background:var(--panel); border:1px solid var(--line); border-radius:16px; overflow:hidden; }
-  .verdict { padding:14px 16px; display:flex; gap:14px; align-items:center; }
-  .verdict.SCAM, .verdict.LIKELY_SCAM { background:var(--scam-bg); color:var(--scam); }
-  .verdict.SUSPICIOUS { background:var(--warn-bg); color:var(--warn); }
-  .verdict.LIKELY_SAFE { background:var(--safe-bg); color:var(--safe); }
-  .verdict.NOT_ENOUGH_INFO { background:var(--info-bg); color:var(--info); }
-  .meter { --p:0; width:58px; height:58px; border-radius:50%; flex:none; display:grid; place-items:center; font-weight:700; font-size:16px;
-           background: conic-gradient(currentColor calc(var(--p)*1%), rgba(0,0,0,.08) 0); position:relative; }
-  .meter::before { content:""; position:absolute; inset:6px; border-radius:50%; background:#fff; }
-  .meter span { position:relative; }
-  .verdict h2 { margin:0; font-size:18px; letter-spacing:.2px; }
-  .verdict .type { font-size:13px; opacity:.9; margin-top:2px; }
-  .body { padding:12px 16px 14px; }
-  .summary { font-size:15.5px; line-height:1.55; margin:0 0 10px; }
-  audio { width:100%; margin:4px 0 8px; }
-  h3 { font-size:12px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:14px 0 6px; }
-  ul { margin:0; padding-left:18px; } li { margin:4px 0; line-height:1.45; font-size:14.5px; }
-  .flag q { display:block; font-style:normal; background:#f3f5f7; border-left:3px solid var(--scam); padding:4px 8px; border-radius:4px; margin-bottom:2px; }
+  body::before { content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background: radial-gradient(60vmax 45vmax at 10% -5%, rgba(124,92,255,.30), transparent 60%),
+                radial-gradient(55vmax 40vmax at 100% 25%, rgba(62,242,200,.14), transparent 60%),
+                radial-gradient(60vmax 50vmax at 40% 110%, rgba(11,18,48,.9), transparent 70%), var(--bg); }
+  .app { max-width:760px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; padding:0 16px; }
+  header { padding:22px 4px 8px; display:flex; align-items:center; gap:12px; }
+  header h1 { margin:0; font-size:30px; font-weight:900; letter-spacing:-.5px; }
+  header h1 span { color:var(--teal); }
+  header p { margin:2px 0 0; color:var(--muted); font-size:14px; }
+  .live { margin-left:auto; display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:99px; background:rgba(62,242,200,.12);
+          color:var(--teal); font-weight:700; font-size:12px; letter-spacing:1px; white-space:nowrap; }
+  .live::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--teal); box-shadow:0 0 10px var(--teal); }
+  #feed { flex:1; padding:8px 0 16px; display:flex; flex-direction:column; gap:16px; }
+  .glass { background:linear-gradient(180deg, var(--glass2), var(--glass)); border:1px solid var(--border); border-radius:24px; padding:18px; }
+  .glass.inner { border-radius:18px; padding:8px 16px; }
+  .glass.accent.SCAM, .glass.accent.LIKELY_SCAM { border-color:rgba(255,77,109,.5); }
+  .glass.accent.SUSPICIOUS { border-color:rgba(255,181,71,.5); }
+  .glass.accent.LIKELY_SAFE { border-color:rgba(62,242,200,.5); }
+  .empty h2 { margin:0 0 6px; font-size:18px; }
+  .ways { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-top:12px; }
+  .way { background:var(--glass); border:1px solid var(--border); border-radius:18px; padding:14px; font-size:13px; color:var(--muted); line-height:1.45; }
+  .way b { display:block; color:var(--text); font-size:15px; margin:4px 0 2px; }
+  .way .ic { font-size:22px; }
+  .empty .try { margin-top:12px; color:var(--muted); font-size:13px; }
+  .me { align-self:flex-end; max-width:85%; background:linear-gradient(135deg, var(--violet), #5b7cff); color:#fff; padding:10px 14px;
+        border-radius:20px 20px 6px 20px; font-size:15px; white-space:pre-wrap; box-shadow:0 6px 24px rgba(124,92,255,.25); }
+  .me .tag { display:block; font-size:12px; opacity:.85; margin-top:4px; }
+  .result { display:flex; flex-direction:column; gap:12px; }
+  .hero { display:flex; flex-direction:column; align-items:center; gap:10px; padding:6px 0; }
+  .gauge { --c:var(--info); --p:0; width:150px; height:150px; border-radius:50%; display:grid; place-items:center; position:relative;
+           background:conic-gradient(var(--c) calc(var(--p)*1%), rgba(255,255,255,.08) 0); filter:drop-shadow(0 0 18px color-mix(in srgb, var(--c) 35%, transparent)); }
+  .gauge::before { content:""; position:absolute; inset:12px; border-radius:50%; background:var(--bg); }
+  .gauge > div { position:relative; text-align:center; }
+  .gauge b { display:block; font-size:44px; font-weight:900; color:var(--c); line-height:1; }
+  .gauge small { color:var(--muted); font-size:11px; letter-spacing:1.5px; font-weight:700; }
+  .SCAM, .LIKELY_SCAM { --c:var(--danger); } .SUSPICIOUS { --c:var(--warn); } .LIKELY_SAFE { --c:var(--teal); } .NOT_ENOUGH_INFO { --c:var(--info); }
+  .chip { color:var(--c); background:color-mix(in srgb, var(--c) 16%, transparent); border:1px solid color-mix(in srgb, var(--c) 45%, transparent);
+          padding:7px 16px; border-radius:99px; font-weight:800; font-size:15px; }
+  .type { font-size:22px; font-weight:800; text-align:center; letter-spacing:-.2px; }
+  .summary { font-size:16px; line-height:1.55; margin:0; }
+  h3 { font-size:11px; text-transform:uppercase; letter-spacing:1.4px; color:var(--muted); margin:8px 0 0; font-weight:700; }
+  .flag { display:flex; flex-direction:column; gap:6px; }
+  .flag q { background:rgba(255,77,109,.10); border:1px solid rgba(255,77,109,.35); border-radius:12px; padding:10px 12px; font-weight:600; font-size:14px; }
   .flag q::before, .flag q::after { content:""; }
-  .actions li:first-child { font-weight:600; }
-  .helpline { display:inline-block; margin-top:10px; background:var(--scam); color:#fff; text-decoration:none; padding:8px 14px; border-radius:20px; font-weight:600; font-size:14px; }
-  details { margin-top:10px; font-size:14px; } summary { cursor:pointer; color:var(--brand-2); }
-  .transcript { white-space:pre-wrap; background:#f7f9fb; border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-top:6px; max-height:260px; overflow:auto; font-size:13.5px; }
-  .meta { font-size:11.5px; color:var(--muted); padding:0 16px 10px; }
-  .answer .body { padding-top:14px; }
-  .err { color:var(--scam); font-size:14px; align-self:center; }
-  .thinking { align-self:flex-start; color:var(--muted); font-size:14px; }
+  .flag span { color:var(--muted); font-size:14px; padding-left:4px; }
+  .fact { display:flex; gap:10px; padding:8px 0; font-size:14.5px; line-height:1.45; }
+  .fact i { font-style:normal; color:var(--teal); font-weight:900; }
+  .step { display:flex; gap:12px; padding:8px 0; font-size:14.5px; line-height:1.45; align-items:flex-start; }
+  .step i { flex:none; width:24px; height:24px; border-radius:50%; background:rgba(124,92,255,.28); display:grid; place-items:center; font-style:normal; font-size:12px; font-weight:800; }
+  .step:first-child span { font-weight:700; }
+  .helpline { display:block; text-align:center; color:var(--danger); background:rgba(255,77,109,.15); border:1px solid rgba(255,77,109,.5);
+              text-decoration:none; padding:15px; border-radius:18px; font-weight:800; }
+  details { font-size:14px; } summary { cursor:pointer; color:var(--teal); padding:4px 0; }
+  .transcript { white-space:pre-wrap; background:var(--glass); border:1px solid var(--border); border-radius:14px; padding:10px 12px; margin-top:6px;
+                max-height:260px; overflow:auto; font-size:13.5px; color:var(--muted); }
+  audio { width:100%; height:40px; border-radius:20px; color-scheme:dark; }
+  .meta { font-size:11.5px; color:var(--muted); text-align:center; padding-top:4px; }
+  .answer .summary { margin:4px 0 8px; }
+  .err { color:var(--warn); font-size:14px; align-self:center; text-align:center; }
+  .thinking { align-self:flex-start; color:var(--violet); font-size:14px; display:flex; align-items:center; gap:10px; }
+  .thinking::before { content:""; width:14px; height:14px; border-radius:50%; border:2px solid var(--violet); border-right-color:transparent; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
   /* composer */
-  .composer { position:sticky; bottom:0; background:linear-gradient(transparent, var(--bg) 18%); padding:14px 16px 18px; }
-  .prefs { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:8px; font-size:13px; color:var(--muted); }
-  .seg { display:inline-flex; border:1px solid var(--line); border-radius:20px; overflow:hidden; background:#fff; }
-  .seg button { border:0; background:none; padding:6px 12px; font-size:13px; cursor:pointer; color:var(--ink); }
-  .seg button.on { background:var(--brand); color:#fff; }
-  select { border:1px solid var(--line); border-radius:20px; padding:6px 10px; background:#fff; font-size:13px; }
-  .box { background:#fff; border:1px solid var(--line); border-radius:18px; padding:8px; display:flex; flex-direction:column; gap:6px; box-shadow:0 2px 10px rgba(20,40,60,.06); }
-  .chip { display:none; align-self:flex-start; background:#eef2f6; border-radius:12px; padding:4px 10px; font-size:13px; }
-  .chip button { border:0; background:none; cursor:pointer; margin-left:6px; color:var(--muted); }
-  textarea { border:0; resize:none; outline:none; font:inherit; font-size:15px; min-height:44px; max-height:180px; padding:6px 8px; }
-  .row { display:flex; align-items:center; gap:6px; }
-  .icon { width:40px; height:40px; border-radius:50%; border:1px solid var(--line); background:#fff; cursor:pointer; font-size:18px; display:grid; place-items:center; }
-  .icon.rec { background:var(--scam); color:#fff; border-color:var(--scam); animation:pulse 1.2s infinite; }
-  @keyframes pulse { 50% { box-shadow:0 0 0 8px rgba(179,38,30,.15); } }
-  #timer { font-size:13px; color:var(--scam); min-width:40px; }
-  .send { margin-left:auto; border:0; background:var(--brand); color:#fff; border-radius:20px; padding:10px 18px; font-size:15px; font-weight:600; cursor:pointer; }
-  .send:disabled { background:#9fb2c4; cursor:default; }
-  .hint { font-size:12px; color:var(--muted); margin:6px 4px 0; }
+  .composer { position:sticky; bottom:0; padding:14px 0 16px; background:linear-gradient(transparent, var(--bg) 22%); }
+  .prefs { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:10px; font-size:13px; color:var(--muted); }
+  .seg { display:inline-flex; border:1px solid var(--border); border-radius:99px; overflow:hidden; background:rgba(14,20,38,.9); }
+  .seg button { border:0; background:none; padding:7px 13px; font-size:13px; cursor:pointer; color:var(--text); }
+  .seg button.on { background:rgba(62,242,200,.16); color:var(--teal); font-weight:700; }
+  select { border:1px solid var(--border); border-radius:99px; padding:7px 12px; background:rgba(14,20,38,.9); color:var(--text); font-size:13px; }
+  .box { background:rgba(14,20,38,.92); border:1px solid var(--border); border-radius:24px; padding:10px; display:flex; flex-direction:column; gap:8px;
+         box-shadow:0 10px 40px rgba(0,0,0,.45); backdrop-filter:blur(12px); }
+  .box:focus-within { border-color:var(--teal); }
+  .chip-file { display:none; align-self:flex-start; background:rgba(62,242,200,.12); color:var(--teal); border-radius:12px; padding:5px 10px; font-size:13px; }
+  .chip-file button { border:0; background:none; cursor:pointer; margin-left:6px; color:var(--muted); }
+  textarea { border:0; resize:none; outline:none; font:inherit; font-size:15px; min-height:46px; max-height:180px; padding:6px 8px; background:transparent; color:var(--text); }
+  textarea::placeholder { color:var(--muted); }
+  .row { display:flex; align-items:center; gap:8px; }
+  .icon { width:44px; height:44px; border-radius:50%; border:1px solid var(--border); background:var(--glass); cursor:pointer; font-size:18px; display:grid; place-items:center; color:var(--text); }
+  .icon:hover { border-color:var(--teal); }
+  .icon.rec { background:var(--danger); border-color:var(--danger); animation:pulse 1.2s infinite; }
+  @keyframes pulse { 50% { box-shadow:0 0 0 10px rgba(255,77,109,.18); } }
+  #timer { font-size:13px; color:var(--danger); min-width:40px; font-weight:700; }
+  .send { margin-left:auto; border:0; background:linear-gradient(90deg, var(--violet), var(--teal)); color:var(--bg); border-radius:18px; padding:12px 22px;
+          font-size:15px; font-weight:800; cursor:pointer; }
+  .send:disabled { opacity:.45; cursor:default; }
+  .hint { font-size:12px; color:var(--muted); margin:8px 4px 0; text-align:center; }
+  .hint b { color:var(--danger); }
+  @media (max-width:560px) { .ways { grid-template-columns:1fr; } header h1 { font-size:26px; } .gauge { width:130px; height:130px; } .gauge b { font-size:38px; } }
 </style>
 </head>
 <body>
 <div class="app">
   <header>
-    <h1>🛡️ Kavach</h1>
-    <p>Got a suspicious call, voice note or message? Check it in any of 11 Indian languages, and get the answer as text, voice, or both.</p>
+    <div>
+      <h1>Kavach <span>Guard</span></h1>
+      <p>AI scam shield · 11 Indian languages · powered by Gnani</p>
+    </div>
+    <div class="live">AI ONLINE</div>
   </header>
 
   <main id="feed">
-    <div class="empty" id="empty">
-      <b>Three ways to check:</b><br>
-      🎙 <b>Speak</b>: describe the call, e.g. <i>"Someone from CBI called, said my Aadhaar is in a money laundering case"</i><br>
-      📎 <b>Upload</b>: a call recording or WhatsApp voice note (mp3, m4a, ogg, opus, wav, amr…)<br>
-      ⌨️ <b>Paste</b>: an SMS or WhatsApp message<br><br>
-      Then ask follow-ups like <i>"I already shared the OTP, what should I do?"</i>
+    <div class="glass empty" id="empty">
+      <h2>Got a suspicious call, voice note or message?</h2>
+      <div style="color:var(--muted);font-size:14px">Check it in any Indian language. Get the answer as text, voice, or both.</div>
+      <div class="ways">
+        <div class="way"><span class="ic">🎙</span><b>Speak</b>Describe the call, e.g. <i>"Someone from CBI said my Aadhaar is in a money laundering case"</i></div>
+        <div class="way"><span class="ic">📎</span><b>Upload</b>A call recording or WhatsApp voice note (m4a, mp3, ogg, opus, wav, amr…)</div>
+        <div class="way"><span class="ic">⌨️</span><b>Paste</b>Any SMS, WhatsApp forward or email</div>
+      </div>
+      <div class="try">Then ask follow-ups like <i>"I already shared the OTP, what should I do?"</i></div>
     </div>
   </main>
 
@@ -105,17 +145,17 @@
       </select>
     </div>
     <div class="box">
-      <div class="chip" id="chip"><span id="chipName"></span><button id="chipX" title="Remove">✕</button></div>
+      <div class="chip-file" id="chip"><span id="chipName"></span><button id="chipX" title="Remove">✕</button></div>
       <textarea id="text" placeholder="Paste a message, or ask a question…"></textarea>
       <div class="row">
         <button class="icon" id="mic" title="Record (tap to start/stop)">🎙</button>
-        <button class="icon" id="attach" title="Upload recording">📎</button>
+        <button class="icon" id="attach" title="Upload a call recording">📎</button>
         <span id="timer"></span>
         <input type="file" id="file" accept="audio/*,video/mp4,.opus,.amr,.m4a" hidden />
-        <button class="send" id="send">Check</button>
+        <button class="send" id="send">Analyse</button>
       </div>
     </div>
-    <div class="hint">Kavach gives guidance, not legal advice. If you've lost money, call <b>1930</b> immediately.</div>
+    <div class="hint">Kavach gives guidance, not legal advice. Lost money? Call <b>1930</b> immediately.</div>
   </div>
 </div>
 
@@ -176,37 +216,41 @@ function encodeWav(x, rate) { const b = new ArrayBuffer(44 + x.length * 2), v = 
 
 // ---------- rendering ----------
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
-const LABEL = { SCAM:'⚠️ SCAM', LIKELY_SCAM:'⚠️ Likely scam', SUSPICIOUS:'⚡ Suspicious', LIKELY_SAFE:'✅ Looks safe', NOT_ENOUGH_INFO:'❔ Need more info' };
+const LABEL = { SCAM:'⛔ Scam', LIKELY_SCAM:'⛔ Likely scam', SUSPICIOUS:'⚠ Suspicious', LIKELY_SAFE:'✔ Looks safe', NOT_ENOUGH_INFO:'❔ Need more info' };
 function add(html, cls) { $('#empty')?.remove(); const d = document.createElement('div'); d.className = cls; d.innerHTML = html; feed.appendChild(d); d.scrollIntoView({ behavior:'smooth', block:'end' }); return d; }
 const note = m => add(esc(m), 'err');
 
+function gauge(score, verdict) {
+  return `<div class="gauge ${esc(verdict)}" style="--p:${score}"><div><b>${score}</b><small>RISK</small></div></div>`;
+}
 function renderResult(d) {
   const r = d.result, voiceOnly = d.output === 'voice', scammy = ['SCAM','LIKELY_SCAM'].includes(r.verdict);
   const audio = d.audio_b64 ? `<audio controls src="data:audio/wav;base64,${d.audio_b64}"></audio>` : '';
   const t = d.timings || {}, total = (t.stt_ms||0) + (t.llm_ms||0) + (t.tts_ms||0);
   const meta = `<div class="meta">${esc(d.input.source)} · heard ${esc(d.input.stt_language || '–')} · replied in ${esc(r.language_name)} · ${total} ms (stt ${t.stt_ms ?? '–'} / llm ${t.llm_ms} / tts ${t.tts_ms ?? '–'})</div>`;
-  const transcript = d.input.transcript ? `<details><summary>What Kavach heard (${esc(d.input.stt_engine)} transcription)</summary><div class="transcript">${esc(d.input.transcript)}</div></details>` : '';
+  const transcript = d.input.transcript ? `<details><summary>What Kavach heard (${esc(d.input.stt_engine)} transcription, Gnani Prisma)</summary><div class="transcript">${esc(d.input.transcript)}</div></details>` : '';
 
   if (r.kind === 'answer') {
-    return add(`<div class="body">${audio}${voiceOnly ? '' : `<p class="summary">${esc(r.summary)}</p>`}${voiceOnly ? `<details><summary>Show text</summary><p class="summary">${esc(r.summary)}</p></details>` : ''}</div>${meta}`, 'card answer');
+    return add(`<div class="glass answer">${audio}${voiceOnly ? `<details><summary>Show text</summary><p class="summary">${esc(r.summary)}</p></details>` : `<p class="summary">${esc(r.summary)}</p>`}${meta}</div>`, 'result');
   }
-  const flags = r.red_flags.map(f => `<li class="flag"><q>${esc(f.quote)}</q>${esc(f.why)}</li>`).join('');
+  const flags = r.red_flags.map(f => `<div class="flag"><q>“${esc(f.quote)}”</q><span>${esc(f.why)}</span></div>`).join('');
   const details = `
-    ${flags ? `<h3>Red flags</h3><ul>${flags}</ul>` : ''}
-    ${r.facts.length ? `<h3>The truth</h3><ul>${r.facts.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
-    ${r.actions.length ? `<h3>What to do now</h3><ul class="actions">${r.actions.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
-    ${scammy ? `<a class="helpline" href="tel:1930">📞 Call 1930 (Cyber Fraud Helpline)</a>` : ''}
+    ${flags ? `<h3>Red flags</h3>${flags}` : ''}
+    ${r.facts.length ? `<h3>The truth</h3><div class="glass inner">${r.facts.map(x => `<div class="fact"><i>✓</i>${esc(x)}</div>`).join('')}</div>` : ''}
+    ${r.actions.length ? `<h3>What to do now</h3><div class="glass inner">${r.actions.map((x, i) => `<div class="step"><i>${i + 1}</i><span>${esc(x)}</span></div>`).join('')}</div>` : ''}
+    ${scammy || r.verdict === 'SUSPICIOUS' ? `<a class="helpline" href="tel:1930">📞 Call 1930 · Cyber fraud helpline</a>` : ''}
     ${transcript}`;
+  const type = r.scam_type_local || r.scam_type;
   return add(`
-    <div class="verdict ${esc(r.verdict)}">
-      <div class="meter" style="--p:${r.risk_score}"><span>${r.risk_score}</span></div>
-      <div><h2>${LABEL[r.verdict] || esc(r.verdict)}</h2><div class="type">${esc(r.scam_type_local || r.scam_type || '')}</div></div>
+    <div class="hero">
+      ${gauge(r.risk_score, r.verdict)}
+      <div class="chip ${esc(r.verdict)}">${LABEL[r.verdict] || esc(r.verdict)}</div>
+      ${type && type !== 'None' ? `<div class="type">${esc(type)}</div>` : ''}
     </div>
-    <div class="body">
-      ${audio}
-      ${voiceOnly ? `<details><summary>Show full details</summary><p class="summary">${esc(r.summary)}</p>${details}</details>`
-                  : `<p class="summary">${esc(r.summary)}</p>${details}`}
-    </div>${meta}`, 'card');
+    ${audio}
+    <div class="glass accent ${esc(r.verdict)}"><p class="summary">${esc(r.summary)}</p></div>
+    ${voiceOnly ? `<details><summary>Show full details</summary>${details}</details>` : details}
+    ${meta}`, 'result');
 }
 
 // ---------- send ----------
@@ -221,9 +265,10 @@ async function send() {
   fd.append('output', output); fd.append('reply_language', $('#lang').value);
   if (sessionId) fd.append('session_id', sessionId);
   textEl.value = ''; const sentFile = pending; clearAttach();
-  const thinking = add(sentFile && !/voice message/.test(sentFile.name) ? 'Listening to the recording and separating speakers… (long files take up to a minute)' : 'Checking…', 'thinking');
+  const thinking = add(sentFile && !/voice message/.test(sentFile.name) ? 'Gnani Prisma is transcribing and separating speakers… (long calls take up to two minutes)' : 'Kavach is checking…', 'thinking');
   try {
-    const res = await fetch('/api/message', { method:'POST', body: fd }), d = await res.json();
+    const res = await fetch('/api/message', { method:'POST', body: fd });
+    const d = await res.json().catch(() => ({ error: `Server error ${res.status}. If the server was asleep, wait 30 seconds and try again.` }));
     thinking.remove(); sessionId = d.session_id || sessionId;
     if (d.error) { note(d.error); return; }
     const card = renderResult(d);
