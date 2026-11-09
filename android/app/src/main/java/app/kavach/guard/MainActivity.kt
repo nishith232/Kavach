@@ -1,7 +1,9 @@
 package app.kavach.guard
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -51,6 +53,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kavach.guard.core.Notifier
+import app.kavach.guard.core.Pipeline
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.UUID
 import app.kavach.guard.core.Store
 import app.kavach.guard.ui.AlertDetailScreen
 import app.kavach.guard.ui.AuroraBackground
@@ -70,12 +77,36 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         openAlertId.value = intent?.getStringExtra(Notifier.EXTRA_ALERT_ID)
+        handleSharedRecording(intent)
         setContent { KavachTheme { KavachRoot(openAlertId) } }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         intent.getStringExtra(Notifier.EXTRA_ALERT_ID)?.let { openAlertId.value = it }
+        handleSharedRecording(intent)
+    }
+
+    /** "Share → Kavach Guard" from the dialer / file manager / WhatsApp: analyse the recording and open its record. */
+    private fun handleSharedRecording(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_SEND) return
+        @Suppress("DEPRECATION")
+        val uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM) ?: return
+        val id = UUID.randomUUID().toString()
+        val app = application as KavachApp
+        app.scope.launch {
+            runCatching { Pipeline.readRecording(applicationContext, uri) }
+                .onSuccess { (name, bytes) ->
+                    withContext(Dispatchers.Main) { openAlertId.value = id }
+                    Pipeline.processRecording(applicationContext, name, bytes, id)
+                }
+                .onFailure { e ->
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, e.message ?: "Couldn't read this recording", Toast.LENGTH_LONG).show()
+                    }
+                }
+        }
+        setIntent(Intent(this, MainActivity::class.java))   // don't re-run on rotation
     }
 }
 

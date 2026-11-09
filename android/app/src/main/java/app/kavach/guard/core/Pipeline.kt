@@ -1,10 +1,13 @@
 package app.kavach.guard.core
 
 import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
 import android.util.Base64
 import app.kavach.guard.service.ShieldListener
 import org.json.JSONObject
 import java.io.File
+import java.io.IOException
 import java.util.UUID
 
 /**
@@ -95,9 +98,61 @@ object Pipeline {
         return alert
     }
 
+    const val MAX_RECORDING_BYTES = 10 * 1024 * 1024   // Gnani batch direct-upload limit
+
+    /** Name and bytes of a picked/shared audio file. Throws with a readable message if it can't be used. */
+    fun readRecording(ctx: Context, uri: Uri): Pair<String, ByteArray> {
+        var name = "call_recording.m4a"
+        var size = -1L
+        ctx.contentResolver.query(uri, null, null, null, null)?.use { c ->
+            if (c.moveToFirst()) {
+                c.getColumnIndex(OpenableColumns.DISPLAY_NAME).takeIf { it >= 0 }?.let { c.getString(it)?.let { n -> name = n } }
+                c.getColumnIndex(OpenableColumns.SIZE).takeIf { it >= 0 && !c.isNull(it) }?.let { size = c.getLong(it) }
+            }
+        }
+        if (size > MAX_RECORDING_BYTES) throw IOException("This recording is over 10 MB. Please trim it or pick a shorter call.")
+        val bytes = ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            ?: throw IOException("Couldn't open the recording.")
+        if (bytes.size > MAX_RECORDING_BYTES) throw IOException("This recording is over 10 MB. Please trim it or pick a shorter call.")
+        if (bytes.size < 1000) throw IOException("This file is empty or too short.")
+        return name to bytes
+    }
+
+    /**
+     * Saved call recording -> Gnani Prisma transcript (speakers separated) -> AI verdict, saved as a record.
+     * The record appears immediately as "checking" so the user can open it while it is analysed.
+     */
+    suspend fun processRecording(ctx: Context, name: String, bytes: ByteArray, recordId: String = UUID.randomUUID().toString()): Alert {
+        val settings = Store.settings.value
+        val pending = Alert(
+            id = recordId, time = System.currentTimeMillis(), appName = "Call recording", pkg = "recording",
+            original = "Transcribing \"$name\" with Gnani Prisma… long calls can take a minute or two.", sender = name,
+            verdict = "CHECKING", risk = 0, scamType = "", scamTypeLocal = "", summary = "",
+            redFlags = emptyList(), facts = emptyList(), actions = emptyList(), language = "", source = "on-device",
+            localLabels = emptyList(), audioPath = null, status = "checking",
+        )
+        Store.addAlert(pending)
+        val alert = try {
+            val json = Api.analyzeAudio(settings.serverUrl, bytes, name, settings.replyLanguage)
+            Store.countAiCheck()
+            val transcript = json.optJSONObject("input")?.optString("transcript").orEmpty()
+            val heard = pending.copy(original = transcript.ifBlank { "(no speech recognised)" })
+            fromServer(ctx, json, heard).copy(localLabels = RuleEngine.scan(transcript).labels)
+        } catch (e: Exception) {
+            pending.copy(
+                verdict = "UNCHECKED", status = "error", original = "Recording: $name",
+                summary = "Kavach couldn't analyse this recording: ${e.message?.take(160)}. " +
+                    "Check that the AI server is reachable, then share or pick the recording again.",
+            )
+        }
+        Store.addAlert(alert)
+        return alert
+    }
+
     /** Full AI check of a record that was only checked on the phone (or failed); updates the same record. */
     suspend fun recheck(ctx: Context, a: Alert): Alert? =
-        process(ctx, a.original, a.pkg, a.appName, Mode.MANUAL, a.sender, recordId = a.id, recordTime = a.time)
+        if (a.pkg == "recording" && a.status == "error") throw IOException("Pick or share the recording again to retry.")
+        else process(ctx, a.original, a.pkg, a.appName, Mode.MANUAL, a.sender, recordId = a.id, recordTime = a.time)
 
     private fun fromServer(ctx: Context, json: JSONObject, pending: Alert): Alert {
         val r = json.getJSONObject("result")
