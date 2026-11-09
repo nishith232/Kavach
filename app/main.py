@@ -62,7 +62,8 @@ def _ms(t0: float) -> int:
 
 @app.get("/")
 async def index():
-    return FileResponse("static/index.html")
+    # no-cache: browsers re-check on every visit, so a new deploy shows up immediately
+    return FileResponse("static/index.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.post("/api/message")
