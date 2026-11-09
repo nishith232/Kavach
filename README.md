@@ -84,6 +84,14 @@ request then takes about 50 seconds. To deploy your own: Render → New → Blue
 open App info → ⋮ → **Allow restricted settings**, then try again. On iQOO/vivo also allow background activity:
 Settings → Battery → Background power consumption management → Kavach Guard → Allow.
 
+## Demo video autopilot
+Drives the live website by itself (real AI verdicts and Gnani voices) with on-screen captions, for screen recording:
+```powershell
+uv run --with playwright playwright install chromium     # once
+uv run --with playwright python -m scripts.demo_autopilot --recording "C:\path\to\scam_call.m4a"
+```
+Start Windows recording (Win + Alt + R) when it asks, press Enter, and stop when it says the demo is finished.
+
 ## Unit tests (no API keys needed)
 ```powershell
 uv run python -m pytest tests -q        # keyword layer, analyzer logic (fake LLM), voice assistant + endpoint (mocked Gnani)
