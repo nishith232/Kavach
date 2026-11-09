@@ -101,6 +101,50 @@
   .send:disabled { opacity:.45; cursor:default; }
   .hint { font-size:12px; color:var(--muted); margin:8px 4px 0; text-align:center; }
   .hint b { color:var(--danger); }
+  /* tabs */
+  .tabs { display:flex; gap:6px; padding:4px; margin:6px 0 4px; background:rgba(14,20,38,.85); border:1px solid var(--border); border-radius:20px; position:sticky; top:8px; z-index:5; backdrop-filter:blur(10px); }
+  .tabs button { flex:1; border:0; background:none; color:var(--muted); padding:10px 8px; border-radius:16px; font-size:14px; font-weight:700; cursor:pointer; }
+  .tabs button.on { background:rgba(62,242,200,.14); color:var(--teal); }
+  .tabs .badge { display:inline-block; min-width:20px; padding:1px 6px; margin-left:6px; border-radius:99px; background:rgba(255,77,109,.2); color:var(--danger); font-size:11px; }
+  .page { display:none; flex:1; flex-direction:column; } .page.on { display:flex; }
+  .pagehead h2 { margin:14px 0 2px; font-size:26px; font-weight:900; letter-spacing:-.4px; }
+  .pagehead p { margin:0 0 12px; color:var(--muted); font-size:14px; }
+  .stats { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-bottom:12px; }
+  .stat { background:var(--glass); border:1px solid color-mix(in srgb, var(--c) 35%, transparent); border-radius:18px; padding:12px; cursor:pointer; }
+  .stat b { display:block; font-size:24px; font-weight:900; color:var(--c); } .stat span { color:var(--muted); font-size:12px; }
+  .pills { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+  .pill { border:1px solid var(--border); background:var(--glass); color:var(--text); border-radius:99px; padding:8px 14px; font-size:14px; font-weight:700; cursor:pointer; }
+  .pill.on { border-color:var(--c); color:var(--c); background:color-mix(in srgb, var(--c) 18%, transparent); }
+  .pill small { color:var(--muted); margin-left:6px; }
+  .all { --c:var(--info); } .genuine { --c:var(--teal); } .suspicious { --c:var(--warn); } .fraud { --c:var(--danger); }
+  .list { display:flex; flex-direction:column; gap:10px; padding-bottom:24px; }
+  .recrow { display:flex; gap:12px; align-items:center; background:linear-gradient(180deg, var(--glass2), var(--glass)); border:1px solid var(--border); border-radius:20px; padding:14px 16px; cursor:pointer; }
+  .recrow:hover { border-color:var(--c); }
+  .recrow .dot { flex:none; width:12px; height:12px; border-radius:50%; background:var(--c); box-shadow:0 0 10px var(--c); }
+  .recrow .body { flex:1; min-width:0; }
+  .recrow .top { display:flex; gap:8px; align-items:baseline; } .recrow .top b { font-size:14px; } .recrow .top time { margin-left:auto; color:var(--muted); font-size:11px; white-space:nowrap; }
+  .recrow .st { color:var(--c); font-size:12px; font-weight:700; }
+  .recrow .snip { color:var(--muted); font-size:13px; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .recrow.LIKELY_SAFE { --c:var(--teal); } .recrow.NOT_ENOUGH_INFO { --c:var(--info); }
+  .ghost { border:1px solid var(--border); background:var(--glass); color:var(--muted); border-radius:14px; padding:8px 12px; cursor:pointer; font-size:13px; }
+  /* ask */
+  .orbwrap { display:flex; flex-direction:column; align-items:center; gap:12px; padding:16px 0 8px; }
+  .orb { width:132px; height:132px; border-radius:50%; border:0; cursor:pointer; font-size:52px; color:var(--bg);
+         background:linear-gradient(135deg, var(--violet), var(--teal)); box-shadow:0 0 0 14px rgba(124,92,255,.14), 0 0 40px rgba(62,242,200,.25); }
+  .orb.rec { background:linear-gradient(135deg, var(--danger), var(--violet)); animation:pulse2 1s infinite; }
+  .orb:disabled { opacity:.6; cursor:default; }
+  @keyframes pulse2 { 50% { box-shadow:0 0 0 24px rgba(255,77,109,.16), 0 0 50px rgba(255,77,109,.35); } }
+  .orbstate { font-size:17px; font-weight:800; } .orbstate.rec { color:var(--danger); }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:6px 0 14px; }
+  .label { font-size:11px; letter-spacing:1.4px; color:var(--muted); font-weight:700; margin-bottom:6px; }
+  /* detail overlay */
+  #detail { position:fixed; inset:0; z-index:20; background:rgba(5,8,18,.97); backdrop-filter:blur(6px); display:none; overflow:auto; }
+  #detail.on { display:block; }
+  #detail .sheet { max-width:720px; margin:24px auto; padding:0 16px 40px; display:flex; flex-direction:column; gap:12px; }
+  #detail .bar { display:flex; align-items:center; gap:10px; }
+  .orig { white-space:pre-wrap; color:var(--muted); font-size:14px; }
+  .who { text-align:center; color:var(--muted); font-size:13px; }
+  .bigbtn { border:0; border-radius:18px; padding:15px; font-weight:800; font-size:15px; cursor:pointer; color:var(--bg); background:linear-gradient(90deg, var(--danger), var(--violet)); }
   @media (max-width:560px) { .ways { grid-template-columns:1fr; } header h1 { font-size:26px; } .gauge { width:130px; height:130px; } .gauge b { font-size:38px; } }
 </style>
 </head>
@@ -114,6 +158,13 @@
     <div class="live">AI ONLINE</div>
   </header>
 
+  <nav class="tabs" id="tabs">
+    <button data-tab="check" class="on">🔍 Check</button>
+    <button data-tab="history">🕘 History<span class="badge" id="threatBadge" hidden></span></button>
+    <button data-tab="ask">🎙 Ask Kavach</button>
+  </nav>
+
+  <section class="page on" id="page-check">
   <main id="feed">
     <div class="glass empty" id="empty">
       <h2>Got a suspicious call, voice note or message?</h2>
@@ -157,7 +208,28 @@
     </div>
     <div class="hint">Kavach gives guidance, not legal advice. Lost money? Call <b>1930</b> immediately.</div>
   </div>
+  </section>
+
+  <section class="page" id="page-history">
+    <div class="pagehead"><h2>History</h2><p>Every message and call you checked here, saved in this browser. Tap one for its full analysis.</p></div>
+    <div class="stats" id="stats"></div>
+    <div class="pills" id="pills"></div>
+    <div class="list" id="list"></div>
+  </section>
+
+  <section class="page" id="page-ask">
+    <div class="pagehead"><h2>Ask Kavach</h2><p>Ask about the messages you've checked, in any Indian language. Answers come only from your real history; Gnani Prisma listens, Gnani Timbre replies.</p></div>
+    <div class="orbwrap">
+      <button class="orb" id="askMic" title="Tap and speak">🎙</button>
+      <div class="orbstate" id="askState">Tap and speak</div>
+    </div>
+    <div class="label" style="text-align:center">TRY SAYING</div>
+    <div class="chips" id="askChips"></div>
+    <div id="askOut" class="result"></div>
+  </section>
 </div>
+
+<div id="detail"><div class="sheet" id="detailSheet"></div></div>
 
 <script>
 const $ = s => document.querySelector(s);
@@ -185,23 +257,34 @@ $('#attach').onclick = () => $('#file').click();
 $('#file').onchange = e => { const f = e.target.files[0]; if (f) attach(f, f.name); };
 
 // ---------- microphone: tap to start / stop, 16 kHz WAV ----------
-let ctx, stream, src, proc, chunks = [], recording = false, t0 = 0, tick;
+let ctx, stream, src, proc, chunks = [], recording = false, t0 = 0, tick, recTarget = 'check';
 const RATE = 16000, MAX_SEC = 270; // ~8.6 MB WAV, under Gnani's 10 MB upload limit
-$('#mic').onclick = () => recording ? stopRec() : startRec().catch(err => note('Mic error: ' + err.message));
-async function startRec() {
+$('#mic').onclick = () => recording ? stopRec() : startRec('check').catch(err => note('Mic error: ' + err.message));
+async function startRec(target = 'check') {
+  recTarget = target;
   if (player) player.pause();
   stream = stream || await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
   ctx = ctx || new AudioContext(); await ctx.resume();
   src = ctx.createMediaStreamSource(stream); proc = ctx.createScriptProcessor(4096, 1, 1); chunks = [];
   proc.onaudioprocess = e => { chunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
   src.connect(proc); proc.connect(ctx.destination);
-  recording = true; t0 = Date.now(); $('#mic').classList.add('rec');
-  tick = setInterval(() => { const s = Math.round((Date.now() - t0) / 1000); $('#timer').textContent = `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; if (s >= MAX_SEC) stopRec(); }, 250);
+  recording = true; t0 = Date.now();
+  const ask = recTarget === 'ask', limit = ask ? 15 : MAX_SEC;
+  (ask ? $('#askMic') : $('#mic')).classList.add('rec');
+  if (ask) { $('#askMic').textContent = '■'; $('#askState').classList.add('rec'); }
+  tick = setInterval(() => { const s = Math.round((Date.now() - t0) / 1000), t = `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+    if (ask) $('#askState').textContent = `Listening… ${t} · tap to finish`; else $('#timer').textContent = t;
+    if (s >= limit) stopRec(); }, 250);
 }
 function stopRec() {
   recording = false; clearInterval(tick); $('#timer').textContent = ''; $('#mic').classList.remove('rec');
+  $('#askMic').classList.remove('rec'); $('#askMic').textContent = '🎙'; $('#askState').classList.remove('rec');
   proc.disconnect(); src.disconnect();
   const pcm = downsample(concat(chunks), ctx.sampleRate, RATE);
+  if (recTarget === 'ask') {
+    if (pcm.length < RATE * 0.6) { askState('That was too short. Tap and say your command.'); return; }
+    return askCommand(encodeWav(pcm, RATE), null);
+  }
   if (pcm.length < RATE * 0.6) { note('Recording too short.'); return; }
   attach(encodeWav(pcm, RATE), `voice message (${Math.round(pcm.length / RATE)}s)`);
 }
@@ -271,6 +354,7 @@ async function send() {
     const d = await res.json().catch(() => ({ error: `Server error ${res.status}. If the server was asleep, wait 30 seconds and try again.` }));
     thinking.remove(); sessionId = d.session_id || sessionId;
     if (d.error) { note(d.error); return; }
+    if (d.result && d.result.kind !== 'answer') saveRecord(d, text, sentFile);
     const card = renderResult(d);
     player = card.querySelector('audio');
     if (player) player.play().catch(() => {});
@@ -279,6 +363,136 @@ async function send() {
 }
 sendBtn.onclick = send;
 textEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+
+// =============== HISTORY: every analysis is saved in this browser ===============
+const KEY = 'kavach.records', MAX_RECORDS = 200;
+let records = (() => { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; } })();
+let filter = 'all';
+const FRAUD = ['SCAM', 'LIKELY_SCAM'], GENUINE = ['LIKELY_SAFE'];
+const isThreat = r => FRAUD.includes(r.verdict) || r.verdict === 'SUSPICIOUS';
+const FILTERS = { all: ['All', () => true], genuine: ['Genuine', r => GENUINE.includes(r.verdict)],
+                  suspicious: ['Suspicious', r => r.verdict === 'SUSPICIOUS'], fraud: ['Fraudulent', r => FRAUD.includes(r.verdict)] };
+function persist() { try { localStorage.setItem(KEY, JSON.stringify(records.slice(0, MAX_RECORDS))); } catch {} }
+function saveRecord(d, text, file) {
+  const r = d.result, rec = {
+    id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()), time: Date.now(),
+    app: file ? (/voice message/.test(file.name) ? 'Voice message' : 'Call recording') : 'Pasted message',
+    sender: file && !/voice message/.test(file.name) ? file.name : '',
+    original: [d.input.transcript, text].filter(Boolean).join('\n\n') || '(no speech recognised)',
+    verdict: r.verdict, risk: r.risk_score, scam_type: r.scam_type, scam_type_local: r.scam_type_local, summary: r.summary,
+    red_flags: r.red_flags, facts: r.facts, actions: r.actions, language_name: r.language_name, source: d.input.source,
+  };
+  records.unshift(rec); records = records.slice(0, MAX_RECORDS); persist(); renderHistory();
+}
+const ago = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : new Date(t).toLocaleDateString(); };
+const recRow = r => `<div class="recrow ${esc(r.verdict)}" data-id="${esc(r.id)}"><span class="dot"></span><div class="body">
+    <div class="top"><b>${esc(r.app)}${r.sender ? ' · ' + esc(r.sender) : ''}</b><time>${ago(r.time)}</time></div>
+    <div class="st">${LABEL[r.verdict] || esc(r.verdict)} · risk ${r.risk}${r.scam_type && r.scam_type !== 'None' ? ' · ' + esc(r.scam_type_local || r.scam_type) : ''}</div>
+    <div class="snip">${esc(r.original.replace(/\n/g, ' '))}</div></div></div>`;
+function renderHistory() {
+  const n = k => records.filter(FILTERS[k][1]).length;
+  $('#stats').innerHTML = [['all', 'Checked'], ['fraud', 'Fraud'], ['suspicious', 'Suspicious'], ['genuine', 'Genuine']]
+    .map(([k, l]) => `<div class="stat ${k}" data-f="${k}"><b>${n(k)}</b><span>${l}</span></div>`).join('');
+  $('#pills').innerHTML = Object.entries(FILTERS).map(([k, [l]]) => `<button class="pill ${k} ${k === filter ? 'on' : ''}" data-f="${k}">${l}<small>${n(k)}</small></button>`).join('')
+    + (records.length ? `<button class="ghost" id="clearHist" style="margin-left:auto">Clear history</button>` : '');
+  const shown = records.filter(FILTERS[filter][1]);
+  $('#list').innerHTML = shown.length ? shown.map(recRow).join('') :
+    `<div class="glass"><b>${records.length ? 'No ' + FILTERS[filter][0].toLowerCase() + ' messages' : 'Nothing checked yet'}</b>
+     <div style="color:var(--muted);font-size:14px;margin-top:4px">${records.length ? 'Nothing in your history matches this filter.' : 'Check a message, voice note or call recording in the Check tab and it will appear here.'}</div></div>`;
+  const threats = records.filter(isThreat).length, b = $('#threatBadge');
+  b.hidden = !threats; b.textContent = threats;
+}
+document.addEventListener('click', e => {
+  const f = e.target.closest('[data-f]'); if (f && f.closest('#page-history')) { filter = f.dataset.f; renderHistory(); return; }
+  const row = e.target.closest('.recrow'); if (row) { openDetail(row.dataset.id); return; }
+  if (e.target.id === 'clearHist' && confirm('Delete all saved checks from this browser?')) { records = []; persist(); renderHistory(); }
+});
+
+// =============== TABS ===============
+function showTab(name) {
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('on', p.id === 'page-' + name));
+  if (name === 'history') renderHistory();
+  window.scrollTo({ top: 0 });
+}
+$('#tabs').onclick = e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); };
+
+// =============== DETAIL: the exact saved record ===============
+function openDetail(id) {
+  const r = records.find(x => x.id === id); if (!r) return;
+  const flags = (r.red_flags || []).map(f => `<div class="flag"><q>“${esc(f.quote)}”</q><span>${esc(f.why)}</span></div>`).join('');
+  const type = r.scam_type_local || r.scam_type;
+  $('#detailSheet').innerHTML = `
+    <div class="bar"><button class="ghost" id="closeDetail">← Back</button><b>Message details</b></div>
+    <div class="hero">${gauge(r.risk, r.verdict)}<div class="chip ${esc(r.verdict)}">${LABEL[r.verdict] || esc(r.verdict)}</div>
+      ${type && type !== 'None' ? `<div class="type">${esc(type)}</div>` : ''}</div>
+    <div class="who">${esc(r.app)}${r.sender ? ' · ' + esc(r.sender) : ''} · ${new Date(r.time).toLocaleString()} · ${ago(r.time)}</div>
+    ${isThreat(r) ? `<button class="bigbtn" id="explainBtn">🔊 Explain aloud</button><div id="explainOut"></div>` : ''}
+    <div class="glass accent ${esc(r.verdict)}"><p class="summary">${esc(r.summary)}</p></div>
+    ${flags ? `<h3>Red flags</h3>${flags}` : ''}
+    ${(r.facts || []).length ? `<h3>The truth</h3><div class="glass inner">${r.facts.map(x => `<div class="fact"><i>✓</i>${esc(x)}</div>`).join('')}</div>` : ''}
+    ${(r.actions || []).length ? `<h3>What to do now</h3><div class="glass inner">${r.actions.map((x, i) => `<div class="step"><i>${i + 1}</i><span>${esc(x)}</span></div>`).join('')}</div>` : ''}
+    ${isThreat(r) ? `<a class="helpline" href="tel:1930">📞 Call 1930 · Cyber fraud helpline</a>` : ''}
+    <h3>Original ${r.app === 'Pasted message' ? 'message' : 'transcript'}</h3><div class="glass"><div class="orig">${esc(r.original)}</div></div>
+    <div class="meta">Verdict by Kavach AI · ${esc(r.source || '')}${r.language_name ? ' · reply in ' + esc(r.language_name) : ''}</div>`;
+  $('#detail').classList.add('on'); $('#detail').scrollTop = 0;
+  $('#closeDetail').onclick = closeDetail;
+  const btn = $('#explainBtn');
+  if (btn) btn.onclick = async () => {
+    btn.disabled = true; btn.textContent = 'Preparing voice…';
+    const a = await callAssistant(null, 'Explain why this message is suspicious', r.id);
+    btn.disabled = false; btn.textContent = '🔊 Explain aloud';
+    $('#explainOut').innerHTML = a.error ? `<div class="err">${esc(a.error)}</div>` : `<div class="glass accent SUSPICIOUS"><p class="summary">${esc(a.reply)}</p></div>`;
+    if (a.audio_b64) playB64(a.audio_b64);
+  };
+}
+function closeDetail() { $('#detail').classList.remove('on'); if (player) player.pause(); }
+$('#detail').onclick = e => { if (e.target.id === 'detail') closeDetail(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+
+// =============== ASK KAVACH: voice commands over the saved records ===============
+const COMMANDS = [['Last hour', 'Check my messages from the last hour'], ['Suspicious', 'Show my suspicious messages'],
+  ['Genuine', 'Show my genuine messages'], ['Latest alerts', 'Read my latest security alerts'],
+  ['Summary', 'Give me a summary of my scanned messages'], ['Explain', 'Explain why this message is suspicious']];
+$('#askChips').innerHTML = COMMANDS.map(([l, c]) => `<button class="pill all" data-cmd="${esc(c)}">${l}</button>`).join('');
+$('#askChips').onclick = e => { const b = e.target.closest('[data-cmd]'); if (b && !recording) askCommand(null, b.dataset.cmd); };
+$('#askMic').onclick = () => recording ? stopRec() : startRec('ask').catch(err => askState('Mic error: ' + err.message));
+const askState = t => { $('#askState').textContent = t; };
+function playB64(b64) { if (player) player.pause(); player = new Audio('data:audio/wav;base64,' + b64); player.play().catch(() => {}); return player; }
+async function callAssistant(wav, text, focusId) {
+  const fd = new FormData();
+  if (wav) fd.append('audio', wav, 'command.wav');
+  if (text) fd.append('text', text);
+  if (focusId) fd.append('focus_id', focusId);
+  fd.append('records', JSON.stringify(records.slice(0, 150).map(r => ({ id: r.id, time: r.time, app: r.app, sender: r.sender,
+    verdict: r.verdict, risk: r.risk, scam_type: r.scam_type, summary: r.summary, snippet: r.original.slice(0, 160),
+    red_flags: (r.red_flags || []).map(f => f.quote).slice(0, 3), actions: (r.actions || []).slice(0, 2) }))));
+  fd.append('now_ms', String(Date.now())); fd.append('reply_language', $('#lang').value); fd.append('output', 'both');
+  try {
+    const res = await fetch('/api/voice/command', { method: 'POST', body: fd });
+    return await res.json().catch(() => ({ error: `Server error ${res.status}. If the server was asleep, wait 30 seconds and try again.` }));
+  } catch (e) { return { error: 'Network error: ' + e.message }; }
+}
+async function askCommand(wav, text) {
+  $('#askMic').disabled = true; askState(wav ? 'Understanding (Gnani Prisma)…' : 'Thinking…');
+  const a = await callAssistant(wav, text);
+  $('#askMic').disabled = false;
+  if (a.error) { askState('Tap and speak'); $('#askOut').innerHTML = `<div class="err">${esc(a.error)}</div>`; return; }
+  const matched = (a.record_ids || []).map(id => records.find(r => r.id === id)).filter(Boolean);
+  $('#askOut').innerHTML = `
+    <div class="glass"><div class="label">YOU SAID</div><div style="font-size:15px">“${esc(a.transcript)}”</div>
+      ${a.heard_by === 'gnani-prisma' ? '<div class="meta" style="text-align:left">Heard by Gnani Prisma</div>' : ''}</div>
+    <div class="glass accent LIKELY_SAFE"><div class="label">KAVACH${a.language_name ? ' · ' + esc(a.language_name) : ''}</div>
+      <p class="summary">${esc(a.reply)}</p>
+      ${a.audio_b64 ? '<button class="ghost" id="replay" style="margin-top:10px">🔊 Replay</button>' : ''}
+      ${a.tts_error ? `<div class="meta" style="text-align:left">Voice unavailable right now; showing text.</div>` : ''}</div>
+    ${matched.length ? `<h3>Messages (${matched.length}) · tap to open</h3><div class="list">${matched.map(recRow).join('')}</div>` : ''}`;
+  if (a.audio_b64) {
+    const pl = playB64(a.audio_b64); askState('Speaking (Gnani Timbre)…');
+    pl.onended = () => askState('Tap and speak'); $('#replay').onclick = () => playB64(a.audio_b64);
+  } else askState('Tap and speak');
+}
+renderHistory();
 </script>
 </body>
 </html>
