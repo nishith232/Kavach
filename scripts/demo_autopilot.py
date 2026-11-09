@@ -100,6 +100,10 @@ def run(url: str, recording: str | None, wake: bool):
         if wake:
             print("Waking the server (free plan can take ~50 s)…")
             page.request.get(url.rstrip("/") + "/health", timeout=120_000)
+        if not page.locator("[data-tab=history]").count():
+            browser.close()
+            raise SystemExit("This server still has the OLD website (no History / Ask tabs).\n"
+                             "On Render: kavach service -> Manual Deploy -> Deploy latest commit, wait for 'Live', then run this again.")
         input("\nStart your screen recorder now (Win + Alt + R), then press Enter here to begin the demo… ")
         page.bring_to_front()
 
