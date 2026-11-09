@@ -1,0 +1,27 @@
+name: Backend tests
+
+on:
+  push:
+    branches: [main, "claude/**"]
+    paths:
+      - "app/**"
+      - "tests/**"
+      - "scripts/**"
+      - "android/app/src/main/assets/rules.json"
+      - ".github/workflows/backend.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -r requirements.txt pytest
+      - name: Unit tests (no API calls)
+        run: python -m pytest tests -q
+      - name: Keyword layer on the benchmark (offline)
+        run: python -m scripts.run_tests --offline

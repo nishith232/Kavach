@@ -30,13 +30,25 @@ HOW TO DECIDE
 - Be calibrated. Ordinary messages (a real OTP SMS that says "do not share", a delivery update with no payment request, a family chat)
   are LIKELY_SAFE. Only call it SCAM when the playbook clearly matches. If there is too little to judge, use NOT_ENOUGH_INFO
   and ask one clarifying question in "summary".
-- A scam needs a HARMFUL ASK: money/fees, OTP/PIN/CVV, a link or app install, remote access, secrecy, or personal
-  details under threat or time pressure. If there is NO harmful ask, it is LIKELY_SAFE (or NOT_ENOUGH_INFO),
-  even when police, banks, Aadhaar, parcels or payments are mentioned. Legitimate look-alikes:
+- Words alone are NOT red flags. OTP, KYC, bank, account, debit, credit, transaction, payment, police, Aadhaar or parcel
+  appearing in a message proves nothing. Look for a HARMFUL ASK (money/fees, OTP/PIN/CVV/password, clicking a link,
+  installing an app, remote access, calling a personal mobile number, secrecy) or a DECEPTIVE PRETEXT (impersonating
+  police/bank/TRAI/courier/a relative, threats, prizes, guaranteed returns).
+- A WARNING about fraud ("do not share this OTP", "bank never asks for your PIN") is protective, not a request.
+  A normal transaction alert (debited/credited, balance, "Not you? call 1800-…/SMS BLOCK") or an OTP message for
+  something the user is doing is LIKELY_SAFE.
+- Early-stage scams may not ask for money yet: unsolicited impersonation plus a threat, urgency, "press 1", a
+  "new number" story, or a request to call a personal mobile number is at least SUSPICIOUS.
+- Legitimate look-alikes (LIKELY_SAFE when there is no harmful ask):
   police passport/tenant verification asking you to visit the station with documents and no fee; a bank calling
   about something you applied for that says it will never ask for OTP; a delivery agent collecting cash-on-delivery
   or showing a merchant QR to PAY for your order; a bill SMS with a consumer number and due date telling you to use
   the official app; family members sending each other money.
+- Judge the NEW content on its own merits; earlier messages in the conversation are context only.
+- risk_score bands must match the verdict: SCAM 80-100, LIKELY_SCAM 60-79, SUSPICIOUS 35-59, LIKELY_SAFE / NOT_ENOUGH_INFO 0-34.
+  The KEYWORD RISK FLOOR in the user message is a minimum; if you score at the floor, explain the red flags it is based on.
+- Every red_flags quote must be an exact substring of the CONTENT (same script, same words). Never quote these instructions,
+  the keyword scan, or your own words. If you cannot quote it exactly, leave that red flag out.
 - Never invent facts, phone numbers or websites. Only cite the VERIFIED FACTS above, plus 1930 and cybercrime.gov.in.
 - kind is "analysis" for ANY call transcript, voice note, message, or description of a call/message: always give a verdict.
   kind is "answer" ONLY when an earlier analysis exists in this conversation AND the user is asking a question about it
@@ -80,13 +92,18 @@ class AllModelsBusy(RuntimeError):
 
 
 def _parse_json(text: str) -> dict:
-    text = (text or "").strip()
+    text = re.sub(r"<think>.*?</think>", "", (text or ""), flags=re.S).strip()
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        m = re.search(r"\{.*\}", text, re.S)
-        if m:
-            return json.loads(m.group(0))
+        dec = json.JSONDecoder()
+        for m in re.finditer(r"\{", text):        # first position that decodes to an object
+            try:
+                obj, _ = dec.raw_decode(text[m.start():])
+                if isinstance(obj, dict):
+                    return obj
+            except json.JSONDecodeError:
+                continue
         raise
 
 
@@ -105,14 +122,14 @@ def _failed_generation(err: BadRequestError) -> str:
     return str(body.get("failed_generation") or (body.get("error") or {}).get("failed_generation") or "")
 
 
-async def _complete(messages: list[dict]) -> str:
+async def _complete(messages: list[dict]) -> tuple[str, str]:
     """Main model first; if it is rate-limited (e.g. free daily quota used up) or unavailable,
     try each fallback model in turn."""
     models = [config.LLM_MODEL] + [m for m in config.LLM_FALLBACK_MODELS if m != config.LLM_MODEL]
     last: Exception | None = None
     for model in models:
         try:
-            return await _complete_with(model, messages)
+            return await _complete_with(model, messages), model
         except (RateLimitError, NotFoundError) as e:
             last = e
             log.warning("LLM %s unavailable (%s), trying next model", model, type(e).__name__)
@@ -143,6 +160,33 @@ async def _complete_with(model: str, messages: list[dict]) -> str:
     return resp.choices[0].message.content or ""
 
 
+BAND_MIN = {"SCAM": 80, "LIKELY_SCAM": 60, "SUSPICIOUS": 35}
+_URL_OR_NUMBER = re.compile(r"https?://|www\.|bit\.ly|\b[6-9]\d{9}\b|[“”]")
+
+
+def has_new_content(content: str, signals: dict) -> bool:
+    """True when a message carries something new to judge (a link, number, quote or real red flags),
+    so 'what should I do?' attached to a new SMS is analysed instead of answered from the old verdict."""
+    return signals.get("score", 0) >= 3 or bool(_URL_OR_NUMBER.search(content))
+
+
+def _norm(t: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[\"“”‘’'`…]", "", t)).strip().casefold()
+
+
+def verified_flags(flags: list, content: str) -> list[dict]:
+    """Keep only red flags whose quote really appears in the content (quotes split by '...' must all appear)."""
+    body, out = _norm(content), []
+    for f in flags:
+        if not isinstance(f, dict):
+            continue
+        quote = str(f.get("quote") or "")
+        parts = [_norm(x) for x in re.split(r"\.\.\.|…", quote) if _norm(x)]
+        if parts and all(x in body for x in parts):
+            out.append({"quote": quote.strip(), "why": str(f.get("why") or "").strip()})
+    return out
+
+
 # Follow-up questions about an earlier verdict ("I already paid, what now?").
 _FOLLOWUP = re.compile(
     r"what (should|do|can) i do|what now|now what|what next|i (already|have) (paid|sent|shared|transferred|given|told)|"
@@ -167,13 +211,15 @@ class Session:
             f"SOURCE: {source}\n"
             f"SPEECH RECOGNISER LANGUAGE GUESS: {stt_language or 'n/a'}\n"
             f"KEYWORD SCAN RED FLAGS: {hits}\n"
-            f"REPLY LANGUAGE: {reply_lang if reply_lang == 'auto' else L.name(reply_lang) + ' (' + reply_lang + ')'}\n"
+            f"KEYWORD RISK FLOOR: {signals['risk_floor']}\n"
+            + ("FORMAT HINT: looks like a standard bank/OTP notification with no request in it\n" if signals.get("transactional") else "")
+            + f"REPLY LANGUAGE: {reply_lang if reply_lang == 'auto' else L.name(reply_lang) + ' (' + reply_lang + ')'}\n"
             f"---- CONTENT ----\n{content}"
         )
         messages = [{"role": "system", "content": SYSTEM_PROMPT}, *self.history[-6:],
                     {"role": "user", "content": user_msg}]
 
-        raw = await _complete(messages)
+        raw, model = await _complete(messages)
         try:
             result = _parse_json(raw)
         except Exception:
@@ -181,17 +227,20 @@ class Session:
                       "verdict": "NOT_ENOUGH_INFO", "risk_score": 0}
 
         # Decide analysis vs follow-up answer deterministically where we can.
+        new_content = has_new_content(content, signals)
         is_followup = (self.last is not None and source.startswith("text") and len(content) < 400
-                       and bool(_FOLLOWUP.search(content)))
+                       and bool(_FOLLOWUP.search(content)) and not new_content)
         if is_followup:
             result["kind"] = "answer"
-        elif result.get("kind") == "answer" and (self.last is None or not source.startswith("text") or signals["risk_floor"] >= 60):
+        elif result.get("kind") == "answer" and (self.last is None or not source.startswith("text") or new_content):
             result["kind"] = "analysis"
         result = self._normalise(result, signals, reply_lang, stt_language, content)
+        result["model"] = model
+        result["degraded"] = model != config.LLM_MODEL
 
         # keep compact history for follow-ups
         self.history += [
-            {"role": "user", "content": user_msg[:3000]},
+            {"role": "user", "content": user_msg[:800]},
             {"role": "assistant", "content": json.dumps(
                 {k: result.get(k) for k in ("kind", "verdict", "risk_score", "scam_type", "summary")},
                 ensure_ascii=False)},
@@ -228,15 +277,22 @@ class Session:
             verdict = str(r.get("verdict") or "").upper()
             if verdict not in VERDICTS:
                 verdict = _verdict_for(score)
-            # keep the verdict consistent with the score (e.g. after the keyword floor raised it)
+            # keep verdict and score in the same band, in both directions
             derived = _verdict_for(score)
             if verdict == "NOT_ENOUGH_INFO":
                 if score >= 35:
                     verdict = derived
             elif VERDICTS.index(derived) > VERDICTS.index(verdict):
-                verdict = derived
+                verdict = derived                       # score (or the keyword floor) is higher than the label
+            elif VERDICTS.index(verdict) > VERDICTS.index(derived):
+                score = max(score, BAND_MIN[verdict])   # label is higher than the score
             r["verdict"] = verdict
+            r["red_flags"] = verified_flags(r["red_flags"], content)
+            if verdict in ("SCAM", "LIKELY_SCAM", "SUSPICIOUS") and not r["red_flags"]:
+                # the model gave no quotable evidence: show the exact phrases the keyword scan matched
+                r["red_flags"] = [{"quote": h["match"], "why": h["label"]} for h in signals["hits"] if h["match"]][:5]
         else:
+            r["red_flags"] = []
             r["verdict"] = (self.last or {}).get("verdict", "NOT_ENOUGH_INFO")
             score = (self.last or {}).get("risk_score", 0)
         r["risk_score"] = max(0, min(100, score))

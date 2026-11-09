@@ -2,7 +2,7 @@ name: Android APK
 
 on:
   push:
-    branches: [main]
+    branches: [main, "claude/**"]
     paths:
       - "android/**"
       - "app/scam_kb.py"
@@ -52,6 +52,7 @@ jobs:
           path: KavachGuard.apk
 
       - name: Publish to the "android-latest" release
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
