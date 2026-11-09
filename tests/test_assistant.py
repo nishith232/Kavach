@@ -146,3 +146,17 @@ def test_api_keys_never_shown_in_errors(monkeypatch):
     monkeypatch.setattr(gnani, "synthesize", boom)
     body = TestClient(main.app).post("/api/speak", data={"text": "hi"}).json()
     assert secret not in body["error"] and "[hidden]" in body["error"]
+
+
+def test_speak_passes_voice_and_clamps_speed(monkeypatch):
+    seen = {}
+
+    async def fake_tts(text, language, voice=None, speed=0.95, **k):
+        seen.update(voice=voice, speed=speed)
+        return b"RIFF"
+    monkeypatch.setattr(gnani, "synthesize", fake_tts)
+    c = TestClient(main.app)
+    assert c.post("/api/speak", data={"text": "hi", "voice": "Avinash", "speed": "5"}).status_code == 200
+    assert seen == {"voice": "Avinash", "speed": 1.3}
+    c.post("/api/speak", data={"text": "hi", "voice": "bad voice!"})
+    assert seen["voice"] is None and seen["speed"] == 0.95

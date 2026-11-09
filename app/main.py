@@ -143,10 +143,13 @@ async def message(
 
 
 @app.post("/api/speak")
-async def speak(text: str = Form(...), language: str = Form("auto")):
-    """Text -> WAV with Gnani Timbre. The phone app calls this only for real scam alerts."""
+async def speak(text: str = Form(...), language: str = Form("auto"), voice: str | None = Form(None),
+                speed: float = Form(0.95)):
+    """Text -> WAV with Gnani Timbre. The phone app calls this only for real scam alerts.
+    Optional voice (a Timbre voice name, e.g. Avinash) and speed (0.8-1.3) are used for demo narration."""
+    voice = voice if voice and voice.isalpha() and len(voice) <= 30 else None
     try:
-        wav = await gnani.synthesize(text[:1500], language)
+        wav = await gnani.synthesize(text[:1500], language, voice=voice, speed=min(1.3, max(0.8, speed)))
         return Response(content=wav, media_type="audio/wav")
     except Exception as e:
         log.exception("speak failed")

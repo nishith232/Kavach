@@ -256,13 +256,13 @@ def tts_language_for(language: str | None, text: str) -> str:
     return guess if guess in TTS_LANGS else "auto"
 
 
-async def _tts_once(text: str, language: str, sample_rate: int, voice: str | None) -> bytes:
+async def _tts_once(text: str, language: str, sample_rate: int, voice: str | None, speed: float = 0.95) -> bytes:
     r = await _request(
         "POST", f"{config.GNANI_BASE}/api/v1/tts/inference",
         headers={**_auth, "Content-Type": "application/json"},
         json={
             "text": text, "model": config.TTS_MODEL, "voice": voice or config.TTS_VOICE,
-            "language": language, "speed": 0.95,
+            "language": language, "speed": speed,
             "audio_config": {"container": "wav", "sample_rate": sample_rate},
         },
     )
@@ -297,8 +297,9 @@ def join_wavs(wavs: list[bytes]) -> bytes:
     return write_wav(ch, width, rate, b"".join(p[3] for p in parsed))
 
 
-async def synthesize(text: str, language: str, voice: str | None = None, sample_rate: int = 24000) -> bytes:
+async def synthesize(text: str, language: str, voice: str | None = None, sample_rate: int = 24000,
+                     speed: float = 0.95) -> bytes:
     """Any length of text -> one WAV. Long text is spoken sentence-group by sentence-group."""
     lang = tts_language_for(language, text)
-    pieces = await asyncio.gather(*[_tts_once(c, lang, sample_rate, voice) for c in _chunks(text)])
+    pieces = await asyncio.gather(*[_tts_once(c, lang, sample_rate, voice, speed) for c in _chunks(text)])
     return join_wavs(list(pieces))
