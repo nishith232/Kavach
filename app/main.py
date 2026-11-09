@@ -138,7 +138,7 @@ async def message(
         }
     except Exception as e:  # show a readable error in the UI instead of a bare 500
         log.exception("message failed")
-        return JSONResponse({"session_id": sid, "error": f"{type(e).__name__}: {str(e)[:300]}"}, 502)
+        return JSONResponse({"session_id": sid, "error": f"{type(e).__name__}: {config.redact(str(e))[:300]}"}, 502)
 
 
 @app.post("/api/speak")
@@ -149,7 +149,7 @@ async def speak(text: str = Form(...), language: str = Form("auto")):
         return Response(content=wav, media_type="audio/wav")
     except Exception as e:
         log.exception("speak failed")
-        return JSONResponse({"error": f"{type(e).__name__}: {str(e)[:200]}"}, 502)
+        return JSONResponse({"error": f"{type(e).__name__}: {config.redact(str(e))[:200]}"}, 502)
 
 
 @app.post("/api/voice/command")
@@ -198,7 +198,7 @@ async def voice_command(
                 audio_b64 = base64.b64encode(await gnani.synthesize(reply, lang)).decode()
             except Exception as e:  # the text answer is still useful without voice
                 log.exception("assistant tts failed")
-                tts_error = f"{type(e).__name__}: {str(e)[:120]}"
+                tts_error = f"{type(e).__name__}: {config.redact(str(e))[:120]}"
             timings["tts_ms"] = _ms(t0)
 
         log.info("assistant intent=%s lang=%s records=%d matched=%d timings=%s",
@@ -211,7 +211,7 @@ async def voice_command(
         }
     except Exception as e:
         log.exception("voice command failed")
-        return JSONResponse({"error": f"{type(e).__name__}: {str(e)[:300]}"}, 502)
+        return JSONResponse({"error": f"{type(e).__name__}: {config.redact(str(e))[:300]}"}, 502)
 
 
 @app.get("/api/rules")

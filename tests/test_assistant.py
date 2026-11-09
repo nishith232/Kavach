@@ -134,3 +134,15 @@ def test_sessions_are_capped(monkeypatch):
         main.get_session(f"s{i}")
     assert list(main.SESSIONS) == ["s2", "s3", "s4"]
     main.SESSIONS.clear()
+
+
+def test_api_keys_never_shown_in_errors(monkeypatch):
+    from app import config
+    secret = "vach_SECRET_KEY_123456"
+    monkeypatch.setattr(config, "GNANI_API_KEY", secret)
+
+    async def boom(*a, **k):
+        raise RuntimeError(f"Illegal header value b'{secret}\\n'")
+    monkeypatch.setattr(gnani, "synthesize", boom)
+    body = TestClient(main.app).post("/api/speak", data={"text": "hi"}).json()
+    assert secret not in body["error"] and "[hidden]" in body["error"]

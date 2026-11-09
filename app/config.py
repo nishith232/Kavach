@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- Gnani speech ---
-GNANI_API_KEY = os.getenv("GNANI_API_KEY", "")
+GNANI_API_KEY = os.getenv("GNANI_API_KEY", "").strip()   # stray newlines from copy-paste break HTTP headers
 GNANI_BASE = "https://api.vachana.ai"
 STT_MODEL = os.getenv("GNANI_STT_MODEL", "prisma-v3.0")
 STT_LANGUAGE = os.getenv("GNANI_STT_LANGUAGE", "indic-auto")
@@ -18,7 +18,7 @@ BATCH_TIMEOUT_SECONDS = 180
 
 # --- LLM (any OpenAI-compatible endpoint; Groq by default) ---
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1")
-LLM_API_KEY = os.getenv("LLM_API_KEY", "")
+LLM_API_KEY = os.getenv("LLM_API_KEY", "").strip()
 LLM_MODEL = os.getenv("LLM_MODEL", "openai/gpt-oss-120b")
 # Tried in order when the main model is rate-limited (each Groq model has its own daily quota).
 LLM_FALLBACK_MODELS = [m.strip() for m in os.getenv(
@@ -36,3 +36,11 @@ KEYTERMS = [
 # Max paid requests (AI analysis, speech, voice commands) per client IP per hour. 0 = no limit.
 RATE_LIMIT_PER_HOUR = int(os.getenv("RATE_LIMIT_PER_HOUR", "0") or 0)
 MAX_SESSIONS = 500   # in-memory follow-up sessions kept (oldest dropped first)
+
+
+def redact(text: str) -> str:
+    """Remove API keys from any text that may be shown to users or written to logs."""
+    for key in (GNANI_API_KEY, LLM_API_KEY):
+        if key and len(key) > 8:
+            text = text.replace(key, "[hidden]")
+    return text
