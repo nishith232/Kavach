@@ -51,10 +51,20 @@ Open http://localhost:8000.
 
 ## 📱 Kavach Guard: Android app (automatic message shield)
 Kavach Guard reads every incoming notification (SMS, WhatsApp, Telegram, email) **the moment it arrives**, before you open it.
-- Each message is checked **on the phone** with the same 44 scam rules as the server. Only suspicious ones are sent to the Kavach server for an AI verdict.
+- Each message is checked **on the phone** with the same scam rules and scoring as the server. Only suspicious ones are sent to the Kavach server for an AI verdict.
 - Scams trigger a **heads-up warning** with a "Call 1930" button, plus a **spoken warning** in your language (Gnani TTS).
 - Includes a modern dark UI: radar shield, alert feed with risk gauge, manual "Check a message" screen, settings.
 - If the server is unreachable, strong on-device matches still trigger a warning.
+
+- **History:** every scanned message is saved on the phone (newest 200, survives restarts) with a stable id.
+  Tap any Live Scan row, dashboard tile, notification or History item to open that exact message: original text,
+  app, sender, time, verdict, risk, red flags, explanation and what to do. Filters: All / Genuine / Suspicious / Fraudulent.
+  Messages only checked on the phone can get a full check with **Analyse with AI**.
+- **Ask Kavach (voice assistant):** tap the mic in the *Ask* tab and speak (Gnani Prisma), e.g. "Check my messages from
+  the last hour", "Show my suspicious messages", "Show my genuine messages", "Read my latest security alerts",
+  "Give me a summary of my scanned messages", "Explain why this message is suspicious". The answer is built only from
+  your real saved records, translated into the language you spoke, and read aloud with Gnani Timbre. Quick-command
+  chips do the same without speaking. On a threat's detail screen, **Explain aloud** explains that exact message.
 
 **Install:** on the phone, open
 https://github.com/nishith232/Kavach/releases/download/android-latest/KavachGuard.apk
@@ -69,7 +79,12 @@ https://github.com/nishith232/Kavach/releases/download/android-latest/KavachGuar
 open App info → ⋮ → **Allow restricted settings**, then try again. On iQOO/vivo also allow background activity:
 Settings → Battery → Background power consumption management → Kavach Guard → Allow.
 
-## Testing (48 realistic cases)
+## Unit tests (no API keys needed)
+```powershell
+uv run python -m pytest tests -q        # keyword layer, analyzer logic (fake LLM), voice assistant + endpoint (mocked Gnani)
+```
+
+## Testing (56 realistic cases)
 `tests/cases.json` holds realistic, fictional cases modelled on real Indian scam scripts:
 - **3 per fraud type** (33): different languages (Hindi, Telugu, Kannada, Tamil, English, Hinglish), channels
   (call recordings with speakers, SMS, WhatsApp, victims describing what happened) and difficulty
