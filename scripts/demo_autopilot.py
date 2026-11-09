@@ -15,6 +15,7 @@ Total length is about 3 minutes (AI and voice replies add a few seconds each).
 """
 import argparse
 import time
+from pathlib import Path
 
 from playwright.sync_api import Page, sync_playwright
 
@@ -174,6 +175,12 @@ def main():
     ap.add_argument("--recording", help="optional call recording (m4a/mp3/wav…) to show the call check")
     ap.add_argument("--no-wake", action="store_true", help="skip the server wake-up call")
     a = ap.parse_args()
+    if a.recording:
+        rec = Path(a.recording.strip('"')).expanduser()
+        if not rec.is_file():
+            raise SystemExit(f"Recording not found: {rec.resolve()}\n"
+                             "Tip: in File Explorer, Shift + right-click the file -> 'Copy as path', and paste it after --recording.")
+        a.recording = str(rec.resolve())
     run(a.url, a.recording, not a.no_wake)
 
 
