@@ -85,7 +85,7 @@ open App info → ⋮ → **Allow restricted settings**, then try again. On iQOO
 Settings → Battery → Background power consumption management → Kavach Guard → Allow.
 
 ## Demo video autopilot
-Drives the live website by itself (real AI verdicts and Gnani voices) with on-screen captions, for screen recording:
+Drives the live website by itself (real AI verdicts and Gnani voices), with captions and a spoken voice-over by Gnani Timbre, for screen recording:
 ```powershell
 uv run --with playwright playwright install chromium     # once
 uv run --with playwright python -m scripts.demo_autopilot --recording "C:\path\to\scam_call.m4a"
