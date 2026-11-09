@@ -31,3 +31,8 @@ KEYTERMS = [
     "AnyDesk", "TeamViewer", "Skype", "video call", "Mumbai police", "cyber crime", "SIM block",
     "electricity bill", "lottery", "refund", "investment", "IPO", "trading", "WhatsApp group",
 ]
+
+# --- Public deployment safety ---
+# Max paid requests (AI analysis, speech, voice commands) per client IP per hour. 0 = no limit.
+RATE_LIMIT_PER_HOUR = int(os.getenv("RATE_LIMIT_PER_HOUR", "0") or 0)
+MAX_SESSIONS = 500   # in-memory follow-up sessions kept (oldest dropped first)

@@ -112,3 +112,25 @@ def test_endpoint_translates_and_survives_tts_failure(monkeypatch):
 def test_endpoint_rejects_empty_command():
     res = TestClient(main.app).post("/api/voice/command", data={"records": "[]"})
     assert res.status_code == 400
+
+
+def test_rate_limit_blocks_after_limit(monkeypatch):
+    from app import config
+    monkeypatch.setattr(config, "RATE_LIMIT_PER_HOUR", 2)
+    main._HITS.clear()
+    client = TestClient(main.app)
+    codes = [client.post("/api/voice/command", data={"text": "summary", "records": "[]", "output": "text"}).status_code
+             for _ in range(3)]
+    assert codes == [200, 200, 429]
+    assert client.get("/health").status_code == 200      # free endpoints never limited
+    main._HITS.clear()
+
+
+def test_sessions_are_capped(monkeypatch):
+    from app import config
+    monkeypatch.setattr(config, "MAX_SESSIONS", 3)
+    main.SESSIONS.clear()
+    for i in range(5):
+        main.get_session(f"s{i}")
+    assert list(main.SESSIONS) == ["s2", "s3", "s4"]
+    main.SESSIONS.clear()

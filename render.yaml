@@ -1,0 +1,21 @@
+# One-click deploy on Render (free plan): New + → Blueprint → pick this repo.
+# Render asks for the two secret keys on first deploy; nothing else to configure.
+services:
+  - type: web
+    name: kavach
+    runtime: python
+    plan: free
+    region: singapore          # closest Render region to India
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: GNANI_API_KEY
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: RATE_LIMIT_PER_HOUR
+        value: "120"

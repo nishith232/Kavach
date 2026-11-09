@@ -11,12 +11,13 @@ import base64
 import logging
 import time
 import uuid
+from collections import OrderedDict, defaultdict, deque
 
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import assistant, gnani, languages
+from . import assistant, config, gnani, languages
 from .analyzer import Session
 from .scam_kb import export_rules, scan
 
@@ -26,7 +27,32 @@ log = logging.getLogger("kavach")
 app = FastAPI(title="Kavach - multilingual scam detector")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-SESSIONS: dict[str, Session] = {}
+SESSIONS: "OrderedDict[str, Session]" = OrderedDict()
+_HITS: dict[str, deque] = defaultdict(deque)
+PAID = {"/api/message", "/api/speak", "/api/voice/command"}
+
+
+@app.middleware("http")
+async def rate_limit(request: Request, call_next):
+    """On a public server, stop one client from spending all the Gnani / LLM credits."""
+    limit = config.RATE_LIMIT_PER_HOUR
+    if limit and request.method == "POST" and request.url.path in PAID:
+        ip = request.client.host if request.client else "?"
+        now, q = time.time(), _HITS[ip]
+        while q and now - q[0] > 3600:
+            q.popleft()
+        if len(q) >= limit:
+            return JSONResponse({"error": "Too many requests from this device. Please try again in a few minutes."}, 429)
+        q.append(now)
+    return await call_next(request)
+
+
+def get_session(sid: str) -> Session:
+    s = SESSIONS.pop(sid, None) or Session()
+    SESSIONS[sid] = s                      # most recently used last
+    while len(SESSIONS) > config.MAX_SESSIONS:
+        SESSIONS.popitem(last=False)
+    return s
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # Gnani batch direct-upload limit
 
 
@@ -48,7 +74,7 @@ async def message(
     session_id: str | None = Form(None),
 ):
     sid = session_id or uuid.uuid4().hex
-    session = SESSIONS.setdefault(sid, Session())
+    session = get_session(sid)
     output = output if output in ("text", "voice", "both") else "both"
     timings, stt = {}, None
 
