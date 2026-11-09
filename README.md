@@ -1,5 +1,7 @@
 # 🛡️ Kavach: multilingual scam detector on Gnani AI
 
+> **[Read the 1-page solution pitch (PITCH.md)](PITCH.md)** · **Live demo:** https://kavach-yqti.onrender.com · **Android app:** [KavachGuard.apk](https://github.com/nishith232/Kavach/releases/download/android-latest/KavachGuard.apk)
+
 Send a suspicious **call recording, voice note, spoken description, or text message**, in any of 11 Indian languages.
 Kavach tells you whether it's a scam, **quotes the exact red-flag words**, gives the facts that disprove them, and tells you what to do.
 You get the answer as **text, voice, or both**, in the same language or one you choose, and you can ask follow-up questions in any mode.
